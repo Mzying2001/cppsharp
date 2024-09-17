@@ -45,43 +45,11 @@ struct FakePtr
 /*================================================================================*/
 
 /**
- * @brief Getter函数指针类型
- */
-template <typename T, typename TOwner>
-using PropertyGetter = T (*)(TOwner &);
-
-/**
- * @brief Setter函数指针类型
- */
-template <typename T, typename TOwner>
-using PropertySetter = void (*)(TOwner &, const T &);
-
-/**
  * @brief 属性基类模板
  */
-template <typename T, typename TOwner, typename TDerived>
-class PropertyBase
+template <typename T, typename TDerived>
+struct PropertyBase
 {
-private:
-    const off_t _offOwner; // 属性与所有者对象的偏移值
-
-public:
-    /**
-     * @brief 构造函数，指定所有者对象
-     */
-    explicit PropertyBase(TOwner &owner)
-        : _offOwner(reinterpret_cast<uint8_t *>(&owner) - reinterpret_cast<uint8_t *>(this)) {}
-
-protected:
-    /**
-     * @brief 获取属性的所有者对象
-     */
-    TOwner &GetOwner() const noexcept
-    {
-        return *reinterpret_cast<TOwner *>(const_cast<uint8_t *>(reinterpret_cast<const uint8_t *>(this)) + this->_offOwner);
-    }
-
-public:
     // /**
     //  * @brief 获取属性值，由子类实现
     //  */
@@ -414,13 +382,56 @@ public:
 /*================================================================================*/
 
 /**
+ * @brief 成员属性Getter函数指针类型
+ */
+template <typename T, typename TOwner>
+using PropertyGetter = T (*)(TOwner &);
+
+/**
+ * @brief 成员属性Setter函数指针类型
+ */
+template <typename T, typename TOwner>
+using PropertySetter = void (*)(TOwner &, const T &);
+
+/**
+ * @brief 成员属性
+ */
+template <typename T, typename TOwner, typename TDerived>
+class MemberProperty : public PropertyBase<T, TDerived>
+{
+private:
+    const off_t _offOwner; // 属性与所有者对象的偏移值
+
+public:
+    /**
+     * @brief 构造函数，指定所有者对象
+     */
+    explicit MemberProperty(TOwner &owner) noexcept
+        : _offOwner(reinterpret_cast<uint8_t *>(&owner) - reinterpret_cast<uint8_t *>(this)) {}
+
+    /**
+     * @brief 继承operator=
+     */
+    using PropertyBase<T, TDerived>::operator=;
+
+protected:
+    /**
+     * @brief 获取属性的所有者对象
+     */
+    TOwner &GetOwner() const noexcept
+    {
+        return *reinterpret_cast<TOwner *>(const_cast<uint8_t *>(reinterpret_cast<const uint8_t *>(this)) + this->_offOwner);
+    }
+};
+
+/**
  * @brief 属性
  */
 template <typename T, typename TOwner>
-class Property : public PropertyBase<T, TOwner, Property<T, TOwner>>
+class Property : public MemberProperty<T, TOwner, Property<T, TOwner>>
 {
 public:
-    using TBase = PropertyBase<T, TOwner, Property<T, TOwner>>;
+    using TBase = MemberProperty<T, TOwner, Property<T, TOwner>>;
     using FnGet = PropertyGetter<T, TOwner>;
     using FnSet = PropertySetter<T, TOwner>;
     using TBase::operator=;
@@ -459,10 +470,10 @@ public:
  * @brief 只读属性
  */
 template <typename T, typename TOwner>
-class ReadOnlyProperty : public PropertyBase<T, TOwner, ReadOnlyProperty<T, TOwner>>
+class ReadOnlyProperty : public MemberProperty<T, TOwner, ReadOnlyProperty<T, TOwner>>
 {
 public:
-    using TBase = PropertyBase<T, TOwner, ReadOnlyProperty<T, TOwner>>;
+    using TBase = MemberProperty<T, TOwner, ReadOnlyProperty<T, TOwner>>;
     using FnGet = PropertyGetter<T, TOwner>;
 
 private:
@@ -490,10 +501,10 @@ public:
  * @brief 只写属性
  */
 template <typename T, typename TOwner>
-class WriteOnlyProperty : public PropertyBase<T, TOwner, WriteOnlyProperty<T, TOwner>>
+class WriteOnlyProperty : public MemberProperty<T, TOwner, WriteOnlyProperty<T, TOwner>>
 {
 public:
-    using TBase = PropertyBase<T, TOwner, WriteOnlyProperty<T, TOwner>>;
+    using TBase = MemberProperty<T, TOwner, WriteOnlyProperty<T, TOwner>>;
     using FnSet = PropertySetter<T, TOwner>;
     using TBase::operator=;
 
@@ -521,6 +532,125 @@ public:
 /*================================================================================*/
 
 /**
+ * @brief 静态属性Getter函数指针类型
+ */
+template <typename T>
+using StaticPropertyGetter = T (*)();
+
+/**
+ * @brief 静态属性Setter函数指针类型
+ */
+template <typename T>
+using StaticPropertySetter = void (*)(const T &);
+
+/**
+ * @brief 静态属性
+ */
+template <typename T>
+class StaticProperty : public PropertyBase<T, StaticProperty<T>>
+{
+public:
+    using TBase = PropertyBase<T, StaticProperty<T>>;
+    using FnGet = StaticPropertyGetter<T>;
+    using FnSet = StaticPropertySetter<T>;
+    using TBase::operator=;
+
+private:
+    const FnGet _getter;
+    const FnSet _setter;
+
+public:
+    /**
+     * @brief 构造属性
+     */
+    StaticProperty(FnGet getter, FnSet setter)
+        : _getter(getter), _setter(setter)
+    {
+    }
+
+    /**
+     * @brief 获取属性值
+     */
+    T GetterImpl() const
+    {
+        return this->_getter();
+    }
+
+    /**
+     * @brief 设置属性值
+     */
+    void SetterImpl(const T &value) const
+    {
+        this->_setter(value);
+    }
+};
+
+/**
+ * @brief 静态只读属性
+ */
+template <typename T>
+class StaticReadOnlyProperty : public PropertyBase<T, StaticReadOnlyProperty<T>>
+{
+public:
+    using TBase = PropertyBase<T, StaticReadOnlyProperty<T>>;
+    using FnGet = StaticPropertyGetter<T>;
+
+private:
+    const FnGet _getter;
+
+public:
+    /**
+     * @brief 构造属性
+     */
+    StaticReadOnlyProperty(FnGet getter)
+        : _getter(getter)
+    {
+    }
+
+    /**
+     * @brief 获取属性值
+     */
+    T GetterImpl() const
+    {
+        return this->_getter();
+    }
+};
+
+/**
+ * @brief 静态只写属性
+ */
+template <typename T>
+class StaticWriteOnlyProperty : public PropertyBase<T, StaticWriteOnlyProperty<T>>
+{
+public:
+    using TBase = PropertyBase<T, StaticWriteOnlyProperty<T>>;
+    using FnSet = StaticPropertySetter<T>;
+    using TBase::operator=;
+
+private:
+    const FnSet _setter;
+
+public:
+    /**
+     * @brief 构造属性
+     */
+    StaticWriteOnlyProperty(FnSet setter)
+        : _setter(setter)
+    {
+    }
+
+    /**
+     * @brief 设置属性值
+     */
+    void SetterImpl(const T &value) const
+    {
+        this->_setter(value);
+    }
+};
+
+/*================================================================================*/
+
+/**
  * @brief 属性类型辅助模板，用于防止宏直接拼接导致的const引用类型不正确的问题
  */
 template <typename T>
@@ -531,7 +661,7 @@ struct PropertyTypeHelper
 };
 
 /**
- * @brief 为当前类启用属性宏支持
+ * @brief 为当前类启用成员属性宏支持
  */
 #define ENABLE_PROPERTY(TSELF) \
     using _TSelf = typename PropertyTypeHelper<TSELF>::Type;
@@ -571,5 +701,41 @@ struct PropertyTypeHelper
  */
 #define SETTER(T) \
     [](_TSelf & self, typename PropertyTypeHelper<T>::TypeConstRef value) -> void
+
+/**
+ * @brief 声明一个静态可读可写属性
+ */
+#define PROPERTY_RW_STATIC(T, NAME) \
+    static const StaticProperty<typename PropertyTypeHelper<T>::Type> NAME
+
+/**
+ * @brief 声明一个静态只读属性
+ */
+#define PROPERTY_R_STATIC(T, NAME) \
+    static const StaticReadOnlyProperty<typename PropertyTypeHelper<T>::Type> NAME
+
+/**
+ * @brief 声明一个静态只写属性
+ */
+#define PROPERTY_W_STATIC(T, NAME) \
+    static const StaticWriteOnlyProperty<typename PropertyTypeHelper<T>::Type> NAME
+
+/**
+ * @brief 同PROPERTY_RW_STATIC，声明一个静态可读可写属性
+ */
+#define PROPERTY_STATIC(T, NAME) \
+    PROPERTY_RW_STATIC(T, NAME)
+
+/**
+ * @brief 静态属性的Getter
+ */
+#define GETTER_STATIC(T) \
+    []() -> typename PropertyTypeHelper<T>::Type
+
+/**
+ * @brief 静态属性的Setter，value表示要设置的值
+ */
+#define SETTER_STATIC(T) \
+    [](typename PropertyTypeHelper<T>::TypeConstRef value) -> void
 
 #endif // _PROP_H_
