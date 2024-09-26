@@ -9,7 +9,7 @@
 ```C++
 class Person
 {
-    // 为当前类启用属性宏支持
+    // 为当前类启用成员属性宏支持
     ENABLE_PROPERTY(Person);
 
     // 属性Age维护的字段
