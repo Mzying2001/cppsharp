@@ -137,6 +137,24 @@ struct PropertyBase
     }
 
     /**
+     * @brief 设置属性值
+     */
+    TDerived &operator=(const PropertyBase &prop)
+    {
+        this->Set(prop.Get());
+        return *static_cast<TDerived *>(this);
+    }
+
+    /**
+     * @brief 设置属性值
+     */
+    const TDerived &operator=(const PropertyBase &prop) const
+    {
+        this->Set(prop.Get());
+        return *static_cast<const TDerived *>(this);
+    }
+
+    /**
      * @brief 加赋值运算
      */
     template <typename U = T>
