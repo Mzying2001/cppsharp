@@ -9,42 +9,38 @@
 ```C++
 class Person
 {
-    // 为当前类启用成员属性宏支持
-    ENABLE_PROPERTY(Person);
-
     // 属性Age维护的字段
     int _age;
 
 public:
     // 声明一个属性Age
-    PROPERTY_RW(int, Age);
+    Property<int> Age;
 
     // 声明AgeStr只读属性，表示Age的字符串
-    PROPERTY_R(string, AgeStr);
+    ReadOnlyProperty<string> AgeStr;
 
     // 构造函数
     Person()
-        : Age(
-              // 使用GETTER宏和SETTER宏设置属性的getter和setter
-              GETTER(int) {
-                  cout << "get Age" << endl;
-                  return self._age; // self表示当前对象
-              },
-              SETTER(int) {
-                  cout << "set Age: " << value << endl; // value表示给属性设置的值
-                  if (value <= 0) {
-                      cout << "error: Age can not smaller than 1" << endl;
-                      return; // 若设置的Age范围不正确则输出错误，不更改值
-                  }
-                  self._age = value;
-              }),
+        : Age(Property<int>::Init(this)
+                  // 使用Property<int>::Init初始化属性
+                  .Getter([](Person *self) {
+                      cout << "get Age" << endl;
+                      return self->_age;
+                  })
+                  .Setter([](Person *self, const int &value) {
+                      cout << "set Age: " << value << endl;
+                      if (value <= 0) {
+                          cout << "error: Age can not smaller than 1" << endl;
+                          return; // 若设置的Age范围不正确则输出错误，不更改值
+                      }
+                      self->_age = value;
+                  })),
 
-          AgeStr(
-              // 只读属性只有getter
-              GETTER(string) {
-                  cout << "get AgeStr" << endl;
-                  return to_string(self._age);
-              })
+          AgeStr(Property<string>::Init(this)
+                     .Getter([](Person *self) {
+                         cout << "get AgeStr" << endl;
+                         return to_string(self->_age);
+                     }))
     {
         _age = 1; // Age默认值
     }
@@ -63,7 +59,7 @@ int main()
     cout << p.Age << endl; // 仍然为1
 
     p.Age = 10;
-    cout << p.Age << endl; // 10
+    cout << p.AgeStr << endl; // 10
 
     Person p2 = p;                      // 对象可以正常拷贝
     p2.Age++;                           // 先get后set
@@ -83,7 +79,7 @@ error: Age can not smaller than 1
 get Age
 1
 set Age: 10
-get Age
+get AgeStr
 10
 get Age
 set Age: 11
