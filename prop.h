@@ -1244,7 +1244,7 @@ public:
 
 protected:
     /**
-     * @brief 属性对象在所有者对象中的偏移量
+     * @brief 所有者对象相对于当前属性对象的偏移量
      */
     std::ptrdiff_t _offset{(std::numeric_limits<std::ptrdiff_t>::max)()};
 
