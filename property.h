@@ -1,5 +1,5 @@
-#ifndef _PROP_H_
-#define _PROP_H_
+#ifndef _PROPERTY_H_
+#define _PROPERTY_H_
 
 #include <cassert>
 #include <cstddef>
@@ -1858,4 +1858,4 @@ public:
     }
 };
 
-#endif // _PROP_H_
+#endif // _PROPERTY_H_
