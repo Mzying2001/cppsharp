@@ -14,7 +14,7 @@
 class Button
 {
 public:
-    // 点击事件，类型为Action<Button*>
+    // 点击事件
     Action<Button *> Clicked;
 
     // 模拟点击按钮
