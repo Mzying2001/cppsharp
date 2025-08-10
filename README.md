@@ -2,7 +2,7 @@
 
 给 C++ 引入类似 C# 的委托（Delegate）和属性（Property）支持。
 
-## `delegate.h`
+## [`delegate.h`](./include/delegate.h)
 
 该头文件为 C++ 提供类似 C# 的委托机制。
 
@@ -69,7 +69,7 @@ Lambda: Button clicked!
 Lambda: Button clicked!
 ```
 
-## `property.h`
+## [`property.h`](./include/property.h)
 
 该头文件为 C++ 提供类似 C# 的属性语法。
 
