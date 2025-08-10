@@ -806,7 +806,7 @@ public:
      */
     TRet operator()(Args... args) const
     {
-        return Invoke(std::forward<Args>(args)...);
+        return _InvokeImpl(std::forward<Args>(args)...);
     }
 
     /**
@@ -928,17 +928,7 @@ public:
      */
     virtual TRet Invoke(Args... args) const override
     {
-        size_t count = _data.Count();
-        if (count == 0) {
-            _ThrowEmptyDelegateError();
-        } else if (count == 1) {
-            return _data[0]->Invoke(std::forward<Args>(args)...);
-        } else {
-            auto list = _data;
-            for (size_t i = 0; i < count - 1; ++i)
-                list[i]->Invoke(std::forward<Args>(args)...);
-            return list[count - 1]->Invoke(std::forward<Args>(args)...);
-        }
+        return _InvokeImpl(std::forward<Args>(args)...);
     }
 
     /**
@@ -1029,6 +1019,24 @@ private:
     [[noreturn]] void _ThrowEmptyDelegateError() const
     {
         throw std::runtime_error("Delegate is empty");
+    }
+
+    /**
+     * @brief 内部函数，Invoke和operator()的实现
+     */
+    inline TRet _InvokeImpl(Args... args) const
+    {
+        size_t count = _data.Count();
+        if (count == 0) {
+            _ThrowEmptyDelegateError();
+        } else if (count == 1) {
+            return _data[0]->Invoke(std::forward<Args>(args)...);
+        } else {
+            auto list = _data;
+            for (size_t i = 0; i < count - 1; ++i)
+                list[i]->Invoke(std::forward<Args>(args)...);
+            return list[count - 1]->Invoke(std::forward<Args>(args)...);
+        }
     }
 };
 
