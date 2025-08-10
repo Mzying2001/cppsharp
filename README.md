@@ -1,8 +1,12 @@
-# `property.h`
+# cppsharp
 
-一个头文件为 C++ 提供类似 C# 的属性语法。
+给 C++ 引入类似 C# 的属性（Property）和委托（Delegate）支持。
 
-## 示例
+## `property.h`
+
+该头文件为 C++ 提供类似 C# 的属性语法。
+
+### 示例
 
 以下定义了一个 `Person` 类，包含一个可读可写属性 `Age` 以及一个只读属性 `AgeStr`，代码演示了属性的声明和初始化。
 
@@ -49,7 +53,7 @@ public:
 
 测试代码如下：
 
-```C++
+```cpp
 int main()
 {
     Person p;
@@ -71,7 +75,7 @@ int main()
 
 运行结果：
 
-```
+```plaintext
 get Age
 1
 set Age: -1
@@ -87,3 +91,6 @@ get AgeStr
 11
 ```
 
+## `delegate.h`
+
+该头文件为 C++ 提供类似 C# 的委托机制。
