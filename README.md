@@ -1,6 +1,6 @@
 # cppsharp
 
-给 C++ 引入类似 C# 的属性（Property）和委托（Delegate）支持。
+给 C++ 引入类似 C# 的委托（Delegate）和属性（Property）支持。
 
 ## `delegate.h`
 
@@ -8,7 +8,7 @@
 
 ### 示例
 
-以下定义了一个 `Button` 类，使用委托定义一个 `Clicked` 事件，通过 `Click` 函数模拟一次按钮点击。`Action` 是 `Delegate<void(Args...)>` 的类型别名，表示无返回值的委托；此外还可以使用 `Func` 表示有返回值的委托，两者的模板参数与 C# 中的 `Action` 和 `Func` 保持一致。
+以下定义了一个 `Button` 类，使用委托定义一个 `Clicked` 事件，通过 `Click` 函数模拟一次按钮点击。`Action` 是 `Delegate<void(Args...)>` 的类型别名，表示无返回值的委托，此外还可以使用 `Func` 表示有返回值的委托，两者的模板参数与 C# 中的 `Action` 和 `Func` 保持一致。
 
 ```cpp
 class Button
