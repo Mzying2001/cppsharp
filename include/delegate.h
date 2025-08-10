@@ -412,7 +412,7 @@ private:
     };
 
     template <typename T>
-    class _CallableWrapperImpl : public _ICallable
+    class _CallableWrapperImpl final : public _ICallable
     {
         alignas(T) mutable uint8_t _storage[sizeof(T)];
 
@@ -490,7 +490,7 @@ private:
     using _CallableWrapper = _CallableWrapperImpl<typename std::decay<T>::type>;
 
     template <typename T>
-    class _MemberFuncWrapper : public _ICallable
+    class _MemberFuncWrapper final : public _ICallable
     {
         T *obj;
         TRet (T::*func)(Args...);
@@ -526,7 +526,7 @@ private:
     };
 
     template <typename T>
-    class _ConstMemberFuncWrapper : public _ICallable
+    class _ConstMemberFuncWrapper final : public _ICallable
     {
         const T *obj;
         TRet (T::*func)(Args...) const;
