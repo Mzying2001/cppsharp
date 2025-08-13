@@ -833,7 +833,7 @@ public:
      * @brief  判断当前委托是否等于nullptr
      * @return 如果委托为空则返回true，否则返回false
      */
-    bool operator==(std::nullptr_t) const
+    bool operator==(std::nullptr_t) const noexcept
     {
         return _data.IsEmpty();
     }
@@ -842,7 +842,7 @@ public:
      * @brief  判断当前委托是否不等于nullptr
      * @return 如果委托不为空则返回true，否则返回false
      */
-    bool operator!=(std::nullptr_t) const
+    bool operator!=(std::nullptr_t) const noexcept
     {
         return !_data.IsEmpty();
     }
@@ -851,7 +851,7 @@ public:
      * @brief  判断当前委托是否有效
      * @return 如果委托不为空则返回true，否则返回false
      */
-    operator bool() const
+    operator bool() const noexcept
     {
         return !_data.IsEmpty();
     }
@@ -1047,7 +1047,7 @@ private:
  * @note  如果委托为空则返回true，否则返回false
  */
 template <typename TRet, typename... Args>
-inline bool operator==(std::nullptr_t, const Delegate<TRet(Args...)> &d)
+inline bool operator==(std::nullptr_t, const Delegate<TRet(Args...)> &d) noexcept
 {
     return d == nullptr;
 }
@@ -1057,7 +1057,7 @@ inline bool operator==(std::nullptr_t, const Delegate<TRet(Args...)> &d)
  * @note  如果委托不为空则返回true，否则返回false
  */
 template <typename TRet, typename... Args>
-inline bool operator!=(std::nullptr_t, const Delegate<TRet(Args...)> &d)
+inline bool operator!=(std::nullptr_t, const Delegate<TRet(Args...)> &d) noexcept
 {
     return d != nullptr;
 }
