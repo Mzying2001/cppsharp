@@ -631,7 +631,7 @@ public:
     /**
      * @brief 移动构造函数
      */
-    Delegate(Delegate &&other)
+    Delegate(Delegate &&other) noexcept
         : _data(std::move(other._data))
     {
     }
@@ -654,7 +654,7 @@ public:
     /**
      * @brief 移动赋值运算符
      */
-    Delegate &operator=(Delegate &&other)
+    Delegate &operator=(Delegate &&other) noexcept
     {
         if (this != &other) {
             _data = std::move(other._data);
