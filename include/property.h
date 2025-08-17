@@ -1250,6 +1250,30 @@ public:
         return this->Get()[prop.Get()];
     }
 
+    /**
+     * @brief 指针下标运算
+     */
+    template <typename U>
+    typename std::enable_if<
+        _BracketOperationHelper<T, U>::value && std::is_pointer<T>::value,
+        typename _BracketOperationHelper<T, U>::type>::type
+    operator[](const U &value) const
+    {
+        return this->Get()[value];
+    }
+
+    /**
+     * @brief 指针下标运算
+     */
+    template <typename D, typename U>
+    typename std::enable_if<
+        _BracketOperationHelper<T, U>::value && std::is_pointer<T>::value,
+        typename _BracketOperationHelper<T, U>::type>::type
+    operator[](const PropertyBase<U, D> &prop) const
+    {
+        return this->Get()[prop.Get()];
+    }
+
 protected:
     /**
      * @brief 所有者对象相对于当前属性对象的偏移量
