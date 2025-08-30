@@ -7,25 +7,22 @@
 #include <limits>
 #include <type_traits>
 
-#define _SW_DEFINE_OPERATION_HELPER(NAME, OP)                                                                                   \
-    template <typename T, typename U, typename = void>                                                                          \
-    struct NAME : std::false_type {                                                                                             \
-    };                                                                                                                          \
-    template <typename T, typename U>                                                                                           \
-    struct NAME<T,                                                                                                              \
-                U,                                                                                                              \
-                typename std::enable_if<true, decltype(void(std::declval<T>() OP std::declval<U>()))>::type> : std::true_type { \
-        using type = decltype(std::declval<T>() OP std::declval<U>());                                                          \
+#define _SW_DEFINE_OPERATION_HELPER(NAME, OP)                                                    \
+    template <typename T, typename U, typename = void>                                           \
+    struct NAME : std::false_type {                                                              \
+    };                                                                                           \
+    template <typename T, typename U>                                                            \
+    struct NAME<T, U, decltype(void(std::declval<T>() OP std::declval<U>()))> : std::true_type { \
+        using type = decltype(std::declval<T>() OP std::declval<U>());                           \
     }
 
-#define _SW_DEFINE_UNARY_OPERATION_HELPER(NAME, OP)                                                           \
-    template <typename T, typename = void>                                                                    \
-    struct NAME : std::false_type {                                                                           \
-    };                                                                                                        \
-    template <typename T>                                                                                     \
-    struct NAME<T,                                                                                            \
-                typename std::enable_if<true, decltype(void(OP std::declval<T>()))>::type> : std::true_type { \
-        using type = decltype(OP std::declval<T>());                                                          \
+#define _SW_DEFINE_UNARY_OPERATION_HELPER(NAME, OP)                         \
+    template <typename T, typename = void>                                  \
+    struct NAME : std::false_type {                                         \
+    };                                                                      \
+    template <typename T>                                                   \
+    struct NAME<T, decltype(void(OP std::declval<T>()))> : std::true_type { \
+        using type = decltype(OP std::declval<T>());                        \
     }
 
 /*================================================================================*/
@@ -117,8 +114,7 @@ struct _BracketOperationHelper : std::false_type {
  */
 template <typename T, typename U>
 struct _BracketOperationHelper<
-    T, U,
-    typename std::enable_if<true, decltype(void(std::declval<T>()[std::declval<U>()]))>::type> : std::true_type {
+    T, U, decltype(void(std::declval<T>()[std::declval<U>()]))> : std::true_type {
     using type = decltype(std::declval<T>()[std::declval<U>()]);
 };
 
@@ -134,8 +130,7 @@ struct _IsExplicitlyConvertable : std::false_type {
  */
 template <typename TFrom, typename TTo>
 struct _IsExplicitlyConvertable<
-    TFrom, TTo,
-    typename std::enable_if<true, decltype(void(static_cast<TTo>(std::declval<TFrom>())))>::type> : std::true_type {
+    TFrom, TTo, decltype(void(static_cast<TTo>(std::declval<TFrom>())))> : std::true_type {
 };
 
 /**
@@ -150,7 +145,7 @@ struct _HasArrowOperator : std::false_type {
  */
 template <typename T>
 struct _HasArrowOperator<
-    T, typename std::enable_if<true, decltype(void(std::declval<T>().operator->()))>::type> : std::true_type {
+    T, decltype(void(std::declval<T>().operator->()))> : std::true_type {
     using type = decltype(std::declval<T>().operator->());
 };
 
