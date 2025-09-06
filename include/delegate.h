@@ -1,6 +1,8 @@
 #ifndef _DELEGATE_H_
 #define _DELEGATE_H_
 
+// #define DELEGATE_DISABLE_SAFEINVOKE
+
 #include <cstdint>
 #include <cstdlib>
 #include <cstring>
@@ -989,7 +991,11 @@ public:
         } else if (count == 1) {
             results.emplace_back(_data[0]->Invoke(std::forward<Args>(args)...));
         } else {
+#if defined(DELEGATE_DISABLE_SAFEINVOKE)
+            auto &list = _data;
+#else
             auto list = _data;
+#endif
             results.reserve(count = list.Count());
             for (size_t i = 0; i < count; ++i) {
                 results.emplace_back(list[i]->Invoke(std::forward<Args>(args)...));
@@ -1031,7 +1037,11 @@ private:
         } else if (count == 1) {
             return _data[0]->Invoke(std::forward<Args>(args)...);
         } else {
+#if defined(DELEGATE_DISABLE_SAFEINVOKE)
+            auto &list = _data;
+#else
             auto list = _data;
+#endif
             for (size_t i = 0; i < count - 1; ++i)
                 list[i]->Invoke(std::forward<Args>(args)...);
             return list[count - 1]->Invoke(std::forward<Args>(args)...);
