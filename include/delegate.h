@@ -1079,6 +1079,12 @@ inline bool operator!=(std::nullptr_t, const Delegate<TRet(Args...)> &d) noexcep
 template <typename... Args>
 using Action = Delegate<void(Args...)>;
 
+/**
+ * @brief Predicate类型别名，表示返回bool的单参数委托
+ */
+template <typename T>
+using Predicate = Delegate<bool(T)>;
+
 /*================================================================================*/
 
 /**
