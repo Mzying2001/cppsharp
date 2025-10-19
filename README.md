@@ -81,40 +81,42 @@ Lambda: Button clicked!
 class Person
 {
     // 属性Age维护的字段
-    int _age;
+    int _age = 1;
+
+    // getter函数
+    int getAge()
+    {
+        std::cout << "get Age" << std::endl;
+        return _age;
+    }
+
+    // setter函数
+    void setAge(const int &value)
+    {
+        std::cout << "set Age: " << value << std::endl;
+
+        if (value > 0) { // 对Age的值进行范围检查
+            _age = value;
+        } else {
+            std::cout << "error: Age can not smaller than 1" << std::endl;
+        }
+    }
 
 public:
-    // 声明一个属性Age
-    Property<int> Age;
+    // 属性Age，通过成员函数初始化
+    Property<int> Age{
+        Property<int>::Init(this)
+            .Getter<&Person::getAge>()
+            .Setter<&Person::setAge>()};
 
-    // 声明AgeStr只读属性，表示Age的字符串
-    ReadOnlyProperty<string> AgeStr;
-
-    // 构造函数
-    Person()
-        : Age(Property<int>::Init(this)
-                  // 使用Property<int>::Init初始化属性
-                  .Getter([](Person *self) {
-                      cout << "get Age" << endl;
-                      return self->_age;
-                  })
-                  .Setter([](Person *self, const int &value) {
-                      cout << "set Age: " << value << endl;
-                      if (value <= 0) {
-                          cout << "error: Age can not smaller than 1" << endl;
-                          return; // 若设置的Age范围不正确则输出错误，不更改值
-                      }
-                      self->_age = value;
-                  })),
-
-          AgeStr(Property<string>::Init(this)
-                     .Getter([](Person *self) {
-                         cout << "get AgeStr" << endl;
-                         return to_string(self->_age);
-                     }))
-    {
-        _age = 1; // Age默认值
-    }
+    // 只读属性AgeStr，表示Age的字符串
+    // 这里使用lambda表达式初始化，第一个参数即属性所有者对象指针，若有setter同理
+    ReadOnlyProperty<std::string> AgeStr{
+        Property<std::string>::Init(this)
+            .Getter([](Person *self) {
+                std::cout << "get AgeStr" << std::endl;
+                return std::to_string(self->_age);
+            })};
 };
 ```
 
@@ -124,17 +126,17 @@ public:
 int main()
 {
     Person p;
-    cout << p.Age << endl; // get Age
+    std::cout << p.Age << std::endl; // get Age
 
-    p.Age = -1;            // error: Age can not smaller than 1
-    cout << p.Age << endl; // 仍然为1
+    p.Age = -1;                      // error: Age can not smaller than 1
+    std::cout << p.Age << std::endl; // 仍然为1
 
     p.Age = 10;
-    cout << p.AgeStr << endl; // 10
+    std::cout << p.AgeStr << std::endl; // 10
 
-    Person p2 = p;                      // 对象可以正常拷贝
-    p2.Age++;                           // 先get后set
-    cout << p2.AgeStr->c_str() << endl; // 使用->可以访问属性成员
+    Person p2 = p;                                // 对象可以正常拷贝
+    p2.Age++;                                     // 先get后set
+    std::cout << p2.AgeStr->c_str() << std::endl; // 使用->可以访问属性成员
 
     return 0;
 }
