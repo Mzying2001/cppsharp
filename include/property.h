@@ -27,9 +27,21 @@
 
 /*================================================================================*/
 
-// 向前声明
+/**
+ * 向前声明
+ */
+
 template <typename T, typename TDerived>
 class PropertyBase;
+
+template <typename T>
+class Property;
+
+template <typename T>
+class ReadOnlyProperty;
+
+template <typename T>
+class WriteOnlyProperty;
 
 /*================================================================================*/
 
@@ -275,6 +287,30 @@ public:
     {
         this->_setter = setter;
         return *this;
+    }
+
+    /**
+     * @brief 设置成员函数getter
+     */
+    template <TValue (TOwner::*getter)()>
+    MemberPropertyInitializer &Getter()
+    {
+        return this->Getter(
+            [](TOwner *owner) -> TValue {
+                return (owner->*getter)();
+            });
+    }
+
+    /**
+     * @brief 设置成员函数setter
+     */
+    template <void (TOwner::*setter)(const TValue &)>
+    MemberPropertyInitializer &Setter()
+    {
+        return this->Setter(
+            [](TOwner *owner, const TValue &value) {
+                (owner->*setter)(value);
+            });
     }
 };
 
