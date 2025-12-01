@@ -1370,16 +1370,21 @@ public:
 
 protected:
     /**
+     * @brief 静态属性偏移量标记
+     */
+    static constexpr std::ptrdiff_t _STATICOFFSET = (std::numeric_limits<std::ptrdiff_t>::max)();
+
+    /**
      * @brief 所有者对象相对于当前属性对象的偏移量
      */
-    std::ptrdiff_t _offset{(std::numeric_limits<std::ptrdiff_t>::max)()};
+    std::ptrdiff_t _offset{_STATICOFFSET};
 
     /**
      * @brief 判断属性是否为静态属性
      */
     bool IsStatic() const noexcept
     {
-        return _offset == (std::numeric_limits<std::ptrdiff_t>::max)();
+        return _offset == _STATICOFFSET;
     }
 
     /**
@@ -1388,7 +1393,7 @@ protected:
     void SetOwner(void *owner) noexcept
     {
         if (owner == nullptr) {
-            _offset = (std::numeric_limits<std::ptrdiff_t>::max)();
+            _offset = _STATICOFFSET;
         } else {
             _offset = reinterpret_cast<uint8_t *>(owner) - reinterpret_cast<uint8_t *>(this);
         }
