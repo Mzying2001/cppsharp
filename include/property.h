@@ -187,6 +187,17 @@ struct _HasArrowOperator<
     using type = decltype(std::declval<T>().operator->());
 };
 
+/**
+ * @brief 属性setter参数类型辅助模板
+ */
+template <typename T>
+using _PropertySetterParamType = typename std::conditional<
+    std::is_arithmetic<T>::value ||
+        std::is_enum<T>::value ||
+        std::is_pointer<T>::value ||
+        std::is_member_pointer<T>::value,
+    T, const T &>::type;
+
 /*================================================================================*/
 
 /**
@@ -260,7 +271,7 @@ private:
     /**
      * @brief setter函数指针
      */
-    void (*_setter)(TOwner *, const TValue &);
+    void (*_setter)(TOwner *, _PropertySetterParamType<TValue>);
 
 public:
     /**
@@ -283,7 +294,7 @@ public:
     /**
      * @brief 设置setter
      */
-    MemberPropertyInitializer &Setter(void (*setter)(TOwner *, const TValue &))
+    MemberPropertyInitializer &Setter(void (*setter)(TOwner *, _PropertySetterParamType<TValue>))
     {
         this->_setter = setter;
         return *this;
@@ -304,11 +315,11 @@ public:
     /**
      * @brief 设置成员函数setter
      */
-    template <void (TOwner::*setter)(const TValue &)>
+    template <void (TOwner::*setter)(_PropertySetterParamType<TValue>)>
     MemberPropertyInitializer &Setter()
     {
         return this->Setter(
-            [](TOwner *owner, const TValue &value) {
+            [](TOwner *owner, _PropertySetterParamType<TValue> value) {
                 (owner->*setter)(value);
             });
     }
@@ -333,7 +344,7 @@ private:
     /**
      * @brief setter函数指针
      */
-    void (*_setter)(const TValue &);
+    void (*_setter)(_PropertySetterParamType<TValue>);
 
 public:
     /**
@@ -356,7 +367,7 @@ public:
     /**
      * @brief 设置setter
      */
-    StaticPropertyInitializer &Setter(void (*setter)(const TValue &))
+    StaticPropertyInitializer &Setter(void (*setter)(_PropertySetterParamType<TValue>))
     {
         this->_setter = setter;
         return *this;
@@ -375,6 +386,9 @@ public:
     // 属性值类型别名
     using TValue = T;
 
+    // setter参数类型别名
+    using TSetterParam = _PropertySetterParamType<T>;
+
     // /**
     //  * @brief 获取属性值，由子类实现
     //  */
@@ -383,7 +397,7 @@ public:
     // /**
     //  * @brief 设置属性值，由子类实现
     //  */
-    // void SetterImpl(const T &value) const;
+    // void SetterImpl(TSetterParam value) const;
 
     /**
      * @brief 访问属性字段，可由子类重写
@@ -404,7 +418,7 @@ public:
     /**
      * @brief 设置属性值
      */
-    void Set(const T &value) const
+    void Set(TSetterParam value) const
     {
         static_cast<const TDerived *>(this)->SetterImpl(value);
     }
@@ -451,7 +465,7 @@ public:
     /**
      * @brief 设置属性值
      */
-    TDerived &operator=(const T &value)
+    TDerived &operator=(TSetterParam value)
     {
         this->Set(value);
         return *static_cast<TDerived *>(this);
@@ -460,7 +474,7 @@ public:
     /**
      * @brief 设置属性值
      */
-    const TDerived &operator=(const T &value) const
+    const TDerived &operator=(TSetterParam value) const
     {
         this->Set(value);
         return *static_cast<const TDerived *>(this);
@@ -488,7 +502,7 @@ public:
      * @brief 加赋值运算
      */
     template <typename U = T>
-    typename std::enable_if<_AddOperationHelper<T, U>::value, TDerived &>::type operator+=(const U &value)
+    typename std::enable_if<_AddOperationHelper<T, U>::value, TDerived &>::type operator+=(_PropertySetterParamType<U> value)
     {
         this->Set(this->Get() + value);
         return *static_cast<TDerived *>(this);
@@ -498,7 +512,7 @@ public:
      * @brief 加赋值运算
      */
     template <typename U = T>
-    typename std::enable_if<_AddOperationHelper<T, U>::value, const TDerived &>::type operator+=(const U &value) const
+    typename std::enable_if<_AddOperationHelper<T, U>::value, const TDerived &>::type operator+=(_PropertySetterParamType<U> value) const
     {
         this->Set(this->Get() + value);
         return *static_cast<const TDerived *>(this);
@@ -528,7 +542,7 @@ public:
      * @brief 减赋值运算
      */
     template <typename U = T>
-    typename std::enable_if<_SubOperationHelper<T, U>::value, TDerived &>::type operator-=(const U &value)
+    typename std::enable_if<_SubOperationHelper<T, U>::value, TDerived &>::type operator-=(_PropertySetterParamType<U> value)
     {
         this->Set(this->Get() - value);
         return *static_cast<TDerived *>(this);
@@ -538,7 +552,7 @@ public:
      * @brief 减赋值运算
      */
     template <typename U = T>
-    typename std::enable_if<_SubOperationHelper<T, U>::value, const TDerived &>::type operator-=(const U &value) const
+    typename std::enable_if<_SubOperationHelper<T, U>::value, const TDerived &>::type operator-=(_PropertySetterParamType<U> value) const
     {
         this->Set(this->Get() - value);
         return *static_cast<const TDerived *>(this);
@@ -568,7 +582,7 @@ public:
      * @brief 乘赋值运算
      */
     template <typename U = T>
-    typename std::enable_if<_MulOperationHelper<T, U>::value, TDerived &>::type operator*=(const U &value)
+    typename std::enable_if<_MulOperationHelper<T, U>::value, TDerived &>::type operator*=(_PropertySetterParamType<U> value)
     {
         this->Set(this->Get() * value);
         return *static_cast<TDerived *>(this);
@@ -578,7 +592,7 @@ public:
      * @brief 乘赋值运算
      */
     template <typename U = T>
-    typename std::enable_if<_MulOperationHelper<T, U>::value, const TDerived &>::type operator*=(const U &value) const
+    typename std::enable_if<_MulOperationHelper<T, U>::value, const TDerived &>::type operator*=(_PropertySetterParamType<U> value) const
     {
         this->Set(this->Get() * value);
         return *static_cast<const TDerived *>(this);
@@ -608,7 +622,7 @@ public:
      * @brief 除赋值运算
      */
     template <typename U = T>
-    typename std::enable_if<_DivOperationHelper<T, U>::value, TDerived &>::type operator/=(const U &value)
+    typename std::enable_if<_DivOperationHelper<T, U>::value, TDerived &>::type operator/=(_PropertySetterParamType<U> value)
     {
         this->Set(this->Get() / value);
         return *static_cast<TDerived *>(this);
@@ -618,7 +632,7 @@ public:
      * @brief 除赋值运算
      */
     template <typename U = T>
-    typename std::enable_if<_DivOperationHelper<T, U>::value, const TDerived &>::type operator/=(const U &value) const
+    typename std::enable_if<_DivOperationHelper<T, U>::value, const TDerived &>::type operator/=(_PropertySetterParamType<U> value) const
     {
         this->Set(this->Get() / value);
         return *static_cast<const TDerived *>(this);
@@ -710,7 +724,7 @@ public:
      * @brief 按位与赋值运算
      */
     template <typename U = T>
-    typename std::enable_if<_BitAndOperationHelper<T, U>::value, TDerived &>::type operator&=(const U &value)
+    typename std::enable_if<_BitAndOperationHelper<T, U>::value, TDerived &>::type operator&=(_PropertySetterParamType<U> value)
     {
         this->Set(this->Get() & value);
         return *static_cast<TDerived *>(this);
@@ -720,7 +734,7 @@ public:
      * @brief 按位与赋值运算
      */
     template <typename U = T>
-    typename std::enable_if<_BitAndOperationHelper<T, U>::value, const TDerived &>::type operator&=(const U &value) const
+    typename std::enable_if<_BitAndOperationHelper<T, U>::value, const TDerived &>::type operator&=(_PropertySetterParamType<U> value) const
     {
         this->Set(this->Get() & value);
         return *static_cast<const TDerived *>(this);
@@ -750,7 +764,7 @@ public:
      * @brief 按位或赋值运算
      */
     template <typename U = T>
-    typename std::enable_if<_BitOrOperationHelper<T, U>::value, TDerived &>::type operator|=(const U &value)
+    typename std::enable_if<_BitOrOperationHelper<T, U>::value, TDerived &>::type operator|=(_PropertySetterParamType<U> value)
     {
         this->Set(this->Get() | value);
         return *static_cast<TDerived *>(this);
@@ -760,7 +774,7 @@ public:
      * @brief 按位或赋值运算
      */
     template <typename U = T>
-    typename std::enable_if<_BitOrOperationHelper<T, U>::value, const TDerived &>::type operator|=(const U &value) const
+    typename std::enable_if<_BitOrOperationHelper<T, U>::value, const TDerived &>::type operator|=(_PropertySetterParamType<U> value) const
     {
         this->Set(this->Get() | value);
         return *static_cast<const TDerived *>(this);
@@ -790,7 +804,7 @@ public:
      * @brief 按位异或赋值运算
      */
     template <typename U = T>
-    typename std::enable_if<_BitXorOperationHelper<T, U>::value, TDerived &>::type operator^=(const U &value)
+    typename std::enable_if<_BitXorOperationHelper<T, U>::value, TDerived &>::type operator^=(_PropertySetterParamType<U> value)
     {
         this->Set(this->Get() ^ value);
         return *static_cast<TDerived *>(this);
@@ -800,7 +814,7 @@ public:
      * @brief 按位异或赋值运算
      */
     template <typename U = T>
-    typename std::enable_if<_BitXorOperationHelper<T, U>::value, const TDerived &>::type operator^=(const U &value) const
+    typename std::enable_if<_BitXorOperationHelper<T, U>::value, const TDerived &>::type operator^=(_PropertySetterParamType<U> value) const
     {
         this->Set(this->Get() ^ value);
         return *static_cast<const TDerived *>(this);
@@ -830,7 +844,7 @@ public:
      * @brief 左移赋值运算
      */
     template <typename U = T>
-    typename std::enable_if<_ShlOperationHelper<T, U>::value, TDerived &>::type operator<<=(const U &value)
+    typename std::enable_if<_ShlOperationHelper<T, U>::value, TDerived &>::type operator<<=(_PropertySetterParamType<U> value)
     {
         this->Set(this->Get() << value);
         return *static_cast<TDerived *>(this);
@@ -840,7 +854,7 @@ public:
      * @brief 左移赋值运算
      */
     template <typename U = T>
-    typename std::enable_if<_ShlOperationHelper<T, U>::value, const TDerived &>::type operator<<=(const U &value) const
+    typename std::enable_if<_ShlOperationHelper<T, U>::value, const TDerived &>::type operator<<=(_PropertySetterParamType<U> value) const
     {
         this->Set(this->Get() << value);
         return *static_cast<const TDerived *>(this);
@@ -870,7 +884,7 @@ public:
      * @brief 右移赋值运算
      */
     template <typename U = T>
-    typename std::enable_if<_ShrOperationHelper<T, U>::value, TDerived &>::type operator>>=(const U &value)
+    typename std::enable_if<_ShrOperationHelper<T, U>::value, TDerived &>::type operator>>=(_PropertySetterParamType<U> value)
     {
         this->Set(this->Get() >> value);
         return *static_cast<TDerived *>(this);
@@ -880,7 +894,7 @@ public:
      * @brief 右移赋值运算
      */
     template <typename U = T>
-    typename std::enable_if<_ShrOperationHelper<T, U>::value, const TDerived &>::type operator>>=(const U &value) const
+    typename std::enable_if<_ShrOperationHelper<T, U>::value, const TDerived &>::type operator>>=(_PropertySetterParamType<U> value) const
     {
         this->Set(this->Get() >> value);
         return *static_cast<const TDerived *>(this);
@@ -964,7 +978,7 @@ public:
      * @brief 加法运算
      */
     template <typename U = T>
-    typename std::enable_if<_AddOperationHelper<T, U>::value, typename _AddOperationHelper<T, U>::type>::type operator+(const U &value) const
+    typename std::enable_if<_AddOperationHelper<T, U>::value, typename _AddOperationHelper<T, U>::type>::type operator+(_PropertySetterParamType<U> value) const
     {
         return this->Get() + value;
     }
@@ -982,7 +996,7 @@ public:
      * @brief 减法运算
      */
     template <typename U = T>
-    typename std::enable_if<_SubOperationHelper<T, U>::value, typename _SubOperationHelper<T, U>::type>::type operator-(const U &value) const
+    typename std::enable_if<_SubOperationHelper<T, U>::value, typename _SubOperationHelper<T, U>::type>::type operator-(_PropertySetterParamType<U> value) const
     {
         return this->Get() - value;
     }
@@ -1000,7 +1014,7 @@ public:
      * @brief 乘法运算
      */
     template <typename U = T>
-    typename std::enable_if<_MulOperationHelper<T, U>::value, typename _MulOperationHelper<T, U>::type>::type operator*(const U &value) const
+    typename std::enable_if<_MulOperationHelper<T, U>::value, typename _MulOperationHelper<T, U>::type>::type operator*(_PropertySetterParamType<U> value) const
     {
         return this->Get() * value;
     }
@@ -1018,7 +1032,7 @@ public:
      * @brief 除法运算
      */
     template <typename U = T>
-    typename std::enable_if<_DivOperationHelper<T, U>::value, typename _DivOperationHelper<T, U>::type>::type operator/(const U &value) const
+    typename std::enable_if<_DivOperationHelper<T, U>::value, typename _DivOperationHelper<T, U>::type>::type operator/(_PropertySetterParamType<U> value) const
     {
         return this->Get() / value;
     }
@@ -1036,7 +1050,7 @@ public:
      * @brief 取模运算
      */
     template <typename U = T>
-    typename std::enable_if<_ModOperationHelper<T, U>::value, typename _ModOperationHelper<T, U>::type>::type operator%(const U &value) const
+    typename std::enable_if<_ModOperationHelper<T, U>::value, typename _ModOperationHelper<T, U>::type>::type operator%(_PropertySetterParamType<U> value) const
     {
         return this->Get() % value;
     }
@@ -1054,7 +1068,7 @@ public:
      * @brief 等于运算
      */
     template <typename U = T>
-    typename std::enable_if<_EqOperationHelper<T, U>::value, typename _EqOperationHelper<T, U>::type>::type operator==(const U &value) const
+    typename std::enable_if<_EqOperationHelper<T, U>::value, typename _EqOperationHelper<T, U>::type>::type operator==(_PropertySetterParamType<U> value) const
     {
         return this->Get() == value;
     }
@@ -1072,7 +1086,7 @@ public:
     // * @brief 不等于运算
     // */
     // template <typename U = T>
-    // typename std::enable_if<_NeOperationHelper<T, U>::value, typename _NeOperationHelper<T, U>::type>::type operator!=(const U &value) const
+    // typename std::enable_if<_NeOperationHelper<T, U>::value, typename _NeOperationHelper<T, U>::type>::type operator!=(_PropertySetterParamType<U> value) const
     //{
     //    return this->Get() != value;
     //}
@@ -1091,7 +1105,7 @@ public:
      * @note  避免与c++20自动生成的!=冲突，改为通过==取反实现
      */
     template <typename U = T>
-    typename std::enable_if<_EqOperationHelper<T, U>::value, typename _EqOperationHelper<T, U>::type>::type operator!=(const U &value) const
+    typename std::enable_if<_EqOperationHelper<T, U>::value, typename _EqOperationHelper<T, U>::type>::type operator!=(_PropertySetterParamType<U> value) const
     {
         return !(*this == value);
     }
@@ -1110,7 +1124,7 @@ public:
      * @brief 小于运算
      */
     template <typename U = T>
-    typename std::enable_if<_LtOperationHelper<T, U>::value, typename _LtOperationHelper<T, U>::type>::type operator<(const U &value) const
+    typename std::enable_if<_LtOperationHelper<T, U>::value, typename _LtOperationHelper<T, U>::type>::type operator<(_PropertySetterParamType<U> value) const
     {
         return this->Get() < value;
     }
@@ -1128,7 +1142,7 @@ public:
      * @brief 小于等于运算
      */
     template <typename U = T>
-    typename std::enable_if<_LeOperationHelper<T, U>::value, typename _LeOperationHelper<T, U>::type>::type operator<=(const U &value) const
+    typename std::enable_if<_LeOperationHelper<T, U>::value, typename _LeOperationHelper<T, U>::type>::type operator<=(_PropertySetterParamType<U> value) const
     {
         return this->Get() <= value;
     }
@@ -1146,7 +1160,7 @@ public:
      * @brief 大于运算
      */
     template <typename U = T>
-    typename std::enable_if<_GtOperationHelper<T, U>::value, typename _GtOperationHelper<T, U>::type>::type operator>(const U &value) const
+    typename std::enable_if<_GtOperationHelper<T, U>::value, typename _GtOperationHelper<T, U>::type>::type operator>(_PropertySetterParamType<U> value) const
     {
         return this->Get() > value;
     }
@@ -1164,7 +1178,7 @@ public:
      * @brief 大于等于运算
      */
     template <typename U = T>
-    typename std::enable_if<_GeOperationHelper<T, U>::value, typename _GeOperationHelper<T, U>::type>::type operator>=(const U &value) const
+    typename std::enable_if<_GeOperationHelper<T, U>::value, typename _GeOperationHelper<T, U>::type>::type operator>=(_PropertySetterParamType<U> value) const
     {
         return this->Get() >= value;
     }
@@ -1182,7 +1196,7 @@ public:
      * @brief 按位与运算
      */
     template <typename U = T>
-    typename std::enable_if<_BitAndOperationHelper<T, U>::value, typename _BitAndOperationHelper<T, U>::type>::type operator&(const U &value) const
+    typename std::enable_if<_BitAndOperationHelper<T, U>::value, typename _BitAndOperationHelper<T, U>::type>::type operator&(_PropertySetterParamType<U> value) const
     {
         return this->Get() & value;
     }
@@ -1200,7 +1214,7 @@ public:
      * @brief 按位或运算
      */
     template <typename U = T>
-    typename std::enable_if<_BitOrOperationHelper<T, U>::value, typename _BitOrOperationHelper<T, U>::type>::type operator|(const U &value) const
+    typename std::enable_if<_BitOrOperationHelper<T, U>::value, typename _BitOrOperationHelper<T, U>::type>::type operator|(_PropertySetterParamType<U> value) const
     {
         return this->Get() | value;
     }
@@ -1218,7 +1232,7 @@ public:
      * @brief 按位异或运算
      */
     template <typename U = T>
-    typename std::enable_if<_BitXorOperationHelper<T, U>::value, typename _BitXorOperationHelper<T, U>::type>::type operator^(const U &value) const
+    typename std::enable_if<_BitXorOperationHelper<T, U>::value, typename _BitXorOperationHelper<T, U>::type>::type operator^(_PropertySetterParamType<U> value) const
     {
         return this->Get() ^ value;
     }
@@ -1236,7 +1250,7 @@ public:
      * @brief 左移运算
      */
     template <typename U = T>
-    typename std::enable_if<_ShlOperationHelper<T, U>::value, typename _ShlOperationHelper<T, U>::type>::type operator<<(const U &value) const
+    typename std::enable_if<_ShlOperationHelper<T, U>::value, typename _ShlOperationHelper<T, U>::type>::type operator<<(_PropertySetterParamType<U> value) const
     {
         return this->Get() << value;
     }
@@ -1254,7 +1268,7 @@ public:
      * @brief 右移运算
      */
     template <typename U = T>
-    typename std::enable_if<_ShrOperationHelper<T, U>::value, typename _ShrOperationHelper<T, U>::type>::type operator>>(const U &value) const
+    typename std::enable_if<_ShrOperationHelper<T, U>::value, typename _ShrOperationHelper<T, U>::type>::type operator>>(_PropertySetterParamType<U> value) const
     {
         return this->Get() >> value;
     }
@@ -1272,7 +1286,7 @@ public:
      * @brief 逻辑与运算
      */
     template <typename U = T>
-    typename std::enable_if<_LogicAndOperationHelper<T, U>::value, typename _LogicAndOperationHelper<T, U>::type>::type operator&&(const U &value) const
+    typename std::enable_if<_LogicAndOperationHelper<T, U>::value, typename _LogicAndOperationHelper<T, U>::type>::type operator&&(_PropertySetterParamType<U> value) const
     {
         return this->Get() && value;
     }
@@ -1290,7 +1304,7 @@ public:
      * @brief 逻辑或运算
      */
     template <typename U = T>
-    typename std::enable_if<_LogicOrOperationHelper<T, U>::value, typename _LogicOrOperationHelper<T, U>::type>::type operator||(const U &value) const
+    typename std::enable_if<_LogicOrOperationHelper<T, U>::value, typename _LogicOrOperationHelper<T, U>::type>::type operator||(_PropertySetterParamType<U> value) const
     {
         return this->Get() || value;
     }
@@ -1312,7 +1326,7 @@ public:
         _BracketOperationHelper<T, U>::value &&
             !std::is_reference<typename _BracketOperationHelper<T, U>::type>::value,
         typename _BracketOperationHelper<T, U>::type>::type
-    operator[](const U &value) const
+    operator[](_PropertySetterParamType<U> value) const
     {
         return this->Get()[value];
     }
@@ -1337,7 +1351,7 @@ public:
     typename std::enable_if<
         _BracketOperationHelper<T, U>::value && std::is_pointer<T>::value,
         typename _BracketOperationHelper<T, U>::type>::type
-    operator[](const U &value) const
+    operator[](_PropertySetterParamType<U> value) const
     {
         return this->Get()[value];
     }
@@ -1803,11 +1817,14 @@ operator||(const T &left, const PropertyBase<U, D> &right)
 template <typename T>
 class Property : public PropertyBase<T, Property<T>>
 {
+public:
     using TBase         = PropertyBase<T, Property<T>>;
+    using TValue        = typename TBase::TValue;
+    using TSetterParam  = typename TBase::TSetterParam;
     using TGetter       = T (*)(void *);
-    using TSetter       = void (*)(void *, const T &);
+    using TSetter       = void (*)(void *, TSetterParam);
     using TStaticGetter = T (*)();
-    using TStaticSetter = void (*)(const T &);
+    using TStaticSetter = void (*)(TSetterParam);
 
 private:
     /**
@@ -1869,7 +1886,7 @@ public:
     /**
      * @brief 设置属性值
      */
-    void SetterImpl(const T &value) const
+    void SetterImpl(TSetterParam value) const
     {
         if (this->IsStatic()) {
             reinterpret_cast<TStaticSetter>(this->_setter)(value);
@@ -1885,7 +1902,10 @@ public:
 template <typename T>
 class ReadOnlyProperty : public PropertyBase<T, ReadOnlyProperty<T>>
 {
+public:
     using TBase         = PropertyBase<T, ReadOnlyProperty<T>>;
+    using TValue        = typename TBase::TValue;
+    using TSetterParam  = typename TBase::TSetterParam;
     using TGetter       = T (*)(void *);
     using TStaticGetter = T (*)();
 
@@ -1939,9 +1959,12 @@ public:
 template <typename T>
 class WriteOnlyProperty : public PropertyBase<T, WriteOnlyProperty<T>>
 {
+public:
     using TBase         = PropertyBase<T, WriteOnlyProperty<T>>;
-    using TSetter       = void (*)(void *, const T &);
-    using TStaticSetter = void (*)(const T &);
+    using TValue        = typename TBase::TValue;
+    using TSetterParam  = typename TBase::TSetterParam;
+    using TSetter       = void (*)(void *, TSetterParam);
+    using TStaticSetter = void (*)(TSetterParam);
 
 private:
     /**
@@ -1982,7 +2005,7 @@ public:
     /**
      * @brief 设置属性值
      */
-    void SetterImpl(const T &value) const
+    void SetterImpl(TSetterParam value) const
     {
         if (this->IsStatic()) {
             reinterpret_cast<TStaticSetter>(this->_setter)(value);
