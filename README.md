@@ -91,7 +91,7 @@ class Person
     }
 
     // setter函数
-    void setAge(const int &value)
+    void setAge(int value)
     {
         std::cout << "set Age: " << value << std::endl;
 
