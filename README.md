@@ -95,10 +95,10 @@ class Person
     {
         std::cout << "set Age: " << value << std::endl;
 
-        if (value > 0) { // 对Age的值进行范围检查
+        if (value >= 0) { // 对Age的值进行范围检查
             _age = value;
         } else {
-            std::cout << "error: Age can not smaller than 1" << std::endl;
+            std::cout << "error: Age can not smaller than 0" << std::endl;
         }
     }
 
@@ -128,7 +128,7 @@ int main()
     Person p;
     std::cout << p.Age << std::endl; // get Age
 
-    p.Age = -1;                      // error: Age can not smaller than 1
+    p.Age = -1;                      // error: Age can not smaller than 0
     std::cout << p.Age << std::endl; // 仍然为1
 
     p.Age = 10;
