@@ -192,12 +192,21 @@ struct _HasArrowOperator<
  * @brief 属性setter参数类型辅助模板
  */
 template <typename T>
-using _PropertySetterParamType = typename std::conditional<
-    std::is_arithmetic<T>::value ||
-        std::is_enum<T>::value ||
-        std::is_pointer<T>::value ||
-        std::is_member_pointer<T>::value,
-    T, const T &>::type;
+struct _PropertySetterParamTypeHelper {
+    using type = typename std::conditional<
+        std::is_arithmetic<T>::value ||
+            std::is_enum<T>::value ||
+            std::is_pointer<T>::value ||
+            std::is_member_pointer<T>::value,
+        T, const T &>::type;
+};
+
+/**
+ * @brief 属性setter参数类型
+ */
+template <typename T>
+using _PropertySetterParamType =
+    typename _PropertySetterParamTypeHelper<typename std::decay<T>::type>::type;
 
 /*================================================================================*/
 
