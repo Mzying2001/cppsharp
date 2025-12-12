@@ -84,7 +84,7 @@ class Person
     int _age = 1;
 
     // getter函数
-    int getAge()
+    int getAge() const
     {
         std::cout << "get Age" << std::endl;
         return _age;
