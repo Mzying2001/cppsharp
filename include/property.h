@@ -194,11 +194,7 @@ struct _HasArrowOperator<
 template <typename T>
 struct _PropertySetterParamTypeHelper {
     using type = typename std::conditional<
-        std::is_arithmetic<T>::value ||
-            std::is_enum<T>::value ||
-            std::is_pointer<T>::value ||
-            std::is_member_pointer<T>::value,
-        T, const T &>::type;
+        std::is_scalar<T>::value, T, const T &>::type;
 };
 
 /**
