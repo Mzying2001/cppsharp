@@ -353,6 +353,30 @@ public:
                 (owner->*setter)(value);
             });
     }
+
+    /**
+     * @brief 设置简单字段getter
+     */
+    template <TValue TOwner::*field>
+    MemberPropertyInitializer &Getter()
+    {
+        return this->Getter(
+            [](TOwner *owner) -> TValue {
+                return owner->*field;
+            });
+    }
+
+    /**
+     * @brief 设置简单字段setter
+     */
+    template <TValue TOwner::*field>
+    MemberPropertyInitializer &Setter()
+    {
+        return this->Setter(
+            [](TOwner *owner, _PropertySetterParamType<TValue> value) {
+                owner->*field = value;
+            });
+    }
 };
 
 /**
