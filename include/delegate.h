@@ -1,7 +1,7 @@
-#ifndef _DELEGATE_H_
-#define _DELEGATE_H_
+#pragma once
 
-// #define DELEGATE_DISABLE_SAFEINVOKE
+#ifndef DELEGATE_H_INCLUDED
+#define DELEGATE_H_INCLUDED
 
 #include <cstdint>
 #include <cstdlib>
@@ -34,9 +34,9 @@ struct ICallable<TRet(Args...)> {
     virtual ~ICallable() = default;
 
     /**
-     * @brief      调用函数
+     * @brief 调用函数
      * @param args 函数参数
-     * @return     函数返回值
+     * @return 函数返回值
      */
     virtual TRet Invoke(Args... args) const = 0;
 
@@ -51,9 +51,9 @@ struct ICallable<TRet(Args...)> {
     virtual std::type_index GetType() const = 0;
 
     /**
-     * @brief       判断当前可调用对象是否与另一个可调用对象相等
+     * @brief 判断当前可调用对象是否与另一个可调用对象相等
      * @param other 另一个可调用对象
-     * @return      如果相等则返回true，否则返回false
+     * @return 如果相等则返回true，否则返回false
      */
     virtual bool Equals(const ICallable &other) const = 0;
 };
@@ -95,9 +95,9 @@ private:
      * @brief 当前状态枚举
      */
     enum : uint8_t {
-        STATE_NONE,   // 未存储任何可调用对象
-        STATE_SINGLE, // 储存了一个可调用对象
-        STATE_LIST,   // 储存了多个可调用对象
+        STATE_NONE,   ///< 未存储任何可调用对象
+        STATE_SINGLE, ///< 储存了一个可调用对象
+        STATE_LIST,   ///< 储存了多个可调用对象
     } _state = STATE_NONE;
 
 public:
@@ -126,6 +126,9 @@ public:
 
     /**
      * @brief 拷贝赋值运算
+     * @note 强异常安全：先在本地完成可能抛异常的 Clone / vector 拷贝，
+     *       全部成功后再原子地切换 *this 的状态。提交阶段（_Reset(state) 与
+     *       unique_ptr/vector 的移动赋值）均为 noexcept，不会导致中间不一致。
      */
     CallableList &operator=(const CallableList &other)
     {
@@ -133,18 +136,21 @@ public:
             return *this;
         }
 
-        _Reset(other._state);
-
         switch (other._state) {
             case STATE_NONE: {
+                _Reset();
                 break;
             }
             case STATE_SINGLE: {
-                _GetSingle().reset(other._GetSingle()->Clone());
+                std::unique_ptr<TCallable> cloned(other._GetSingle()->Clone());
+                _Reset(STATE_SINGLE);
+                _GetSingle() = std::move(cloned);
                 break;
             }
             case STATE_LIST: {
-                _GetList() = other._GetList();
+                TSharedList copied = other._GetList();
+                _Reset(STATE_LIST);
+                _GetList() = std::move(copied);
                 break;
             }
         }
@@ -189,7 +195,7 @@ public:
     }
 
     /**
-     * @brief  获取当前存储的可调用对象数量
+     * @brief 获取当前存储的可调用对象数量
      * @return 可调用对象的数量
      */
     size_t Count() const noexcept
@@ -208,7 +214,7 @@ public:
     }
 
     /**
-     * @brief  判断当前存储的可调用对象是否为空
+     * @brief 判断当前存储的可调用对象是否为空
      * @return 如果没有存储任何可调用对象则返回true，否则返回false
      */
     bool IsEmpty() const noexcept
@@ -226,7 +232,13 @@ public:
 
     /**
      * @brief 添加一个可调用对象到列表中
-     * @note  传入对象的生命周期将由CallableList管理
+     * @note 传入对象的生命周期将由CallableList管理
+     * @note 异常安全：
+     *       - SINGLE→LIST 升级时使用 reserve(2) 避免后续 emplace_back 触发扩容，
+     *         此时唯一的失败路径是 shared_ptr 控制块分配失败，shared_ptr 构造函数
+     *         保证抛异常时自动 delete 传入的裸指针。
+     *       - STATE_LIST 分支先把裸指针转交给本地 shared_ptr，再 emplace_back，
+     *         即使 vector 扩容失败，本地 shared_ptr 析构时也会正确释放对象。
      */
     void Add(TCallable *callable)
     {
@@ -242,6 +254,7 @@ public:
             }
             case STATE_SINGLE: {
                 TSharedList list;
+                list.reserve(2);
                 list.emplace_back(_GetSingle().release());
                 list.emplace_back(callable);
                 _Reset(STATE_LIST);
@@ -249,14 +262,15 @@ public:
                 break;
             }
             case STATE_LIST: {
-                _GetList().emplace_back(callable);
+                std::shared_ptr<TCallable> sp(callable);
+                _GetList().emplace_back(std::move(sp));
                 break;
             }
         }
     }
 
     /**
-     * @brief  移除指定索引处的可调用对象
+     * @brief 移除指定索引处的可调用对象
      * @return 如果成功移除则返回true，否则返回false
      */
     bool RemoveAt(size_t index) noexcept
@@ -279,11 +293,9 @@ public:
                 if (list.empty()) {
                     _Reset();
                 }
-                // else if (list.size() == 1) {
-                //     auto ptr = list.front()->Clone();
-                //     _Reset(STATE_SINGLE);
-                //     _GetSingle().reset(ptr);
-                // }
+                // 注：LIST 仅剩 1 元素时不降级回 SINGLE。shared_ptr 无法转移给
+                // unique_ptr，强行 Clone 反而带来额外开销，保留 LIST 单元素状态
+                // 在功能与性能上都可接受。
                 return true;
             }
             default: {
@@ -293,7 +305,7 @@ public:
     }
 
     /**
-     * @brief  获取指定索引处的可调用对象
+     * @brief 获取指定索引处的可调用对象
      * @return 如果索引有效则返回对应的可调用对象，否则返回nullptr
      */
     TCallable *GetAt(size_t index) const noexcept
@@ -313,7 +325,7 @@ public:
     }
 
     /**
-     * @brief  获取指定索引处的可调用对象
+     * @brief 获取指定索引处的可调用对象
      * @return 如果索引有效则返回对应的可调用对象，否则返回nullptr
      */
     TCallable *operator[](size_t index) const noexcept
@@ -454,8 +466,8 @@ private:
             return EqualsImpl(other);
         }
         template <typename U = T>
-        typename std::enable_if<_IsEqualityComparable<U>::value, bool>::type
-        EqualsImpl(const _ICallable &other) const
+        auto EqualsImpl(const _ICallable &other) const
+            -> typename std::enable_if<_IsEqualityComparable<U>::value, bool>::type
         {
             if (this == &other) {
                 return true;
@@ -467,8 +479,8 @@ private:
             return GetValue() == otherWrapper.GetValue();
         }
         template <typename U = T>
-        typename std::enable_if<!_IsEqualityComparable<U>::value && _IsMemcmpSafe<U>::value, bool>::type
-        EqualsImpl(const _ICallable &other) const
+        auto EqualsImpl(const _ICallable &other) const
+            -> typename std::enable_if<!_IsEqualityComparable<U>::value && _IsMemcmpSafe<U>::value, bool>::type
         {
             if (this == &other) {
                 return true;
@@ -480,11 +492,19 @@ private:
             return memcmp(_storage, otherWrapper._storage, sizeof(_storage)) == 0;
         }
         template <typename U = T>
-        typename std::enable_if<!_IsEqualityComparable<U>::value && !_IsMemcmpSafe<U>::value, bool>::type
-        EqualsImpl(const _ICallable &other) const
+        auto EqualsImpl(const _ICallable &other) const
+            -> typename std::enable_if<!_IsEqualityComparable<U>::value && !_IsMemcmpSafe<U>::value, bool>::type
         {
             return this == &other;
         }
+
+    public:
+        // 禁用拷贝/移动：默认实现会按字节拷贝 _storage，不会调用 T 的构造函数，
+        // 对非平凡可拷贝类型会破坏不变式。需要克隆请走 Clone()。
+        _CallableWrapperImpl(const _CallableWrapperImpl &)            = delete;
+        _CallableWrapperImpl(_CallableWrapperImpl &&)                 = delete;
+        _CallableWrapperImpl &operator=(const _CallableWrapperImpl &) = delete;
+        _CallableWrapperImpl &operator=(_CallableWrapperImpl &&)      = delete;
     };
 
     template <typename T>
@@ -524,6 +544,13 @@ private:
             const auto &otherWrapper = static_cast<const _MemberFuncWrapper &>(other);
             return obj == otherWrapper.obj && func == otherWrapper.func;
         }
+
+    public:
+        // 禁用拷贝/移动：与 _CallableWrapperImpl 保持一致，需要克隆请走 Clone()。
+        _MemberFuncWrapper(const _MemberFuncWrapper &)            = delete;
+        _MemberFuncWrapper(_MemberFuncWrapper &&)                 = delete;
+        _MemberFuncWrapper &operator=(const _MemberFuncWrapper &) = delete;
+        _MemberFuncWrapper &operator=(_MemberFuncWrapper &&)      = delete;
     };
 
     template <typename T>
@@ -560,6 +587,13 @@ private:
             const auto &otherWrapper = static_cast<const _ConstMemberFuncWrapper &>(other);
             return obj == otherWrapper.obj && func == otherWrapper.func;
         }
+
+    public:
+        // 禁用拷贝/移动：与 _CallableWrapperImpl 保持一致，需要克隆请走 Clone()。
+        _ConstMemberFuncWrapper(const _ConstMemberFuncWrapper &)            = delete;
+        _ConstMemberFuncWrapper(_ConstMemberFuncWrapper &&)                 = delete;
+        _ConstMemberFuncWrapper &operator=(const _ConstMemberFuncWrapper &) = delete;
+        _ConstMemberFuncWrapper &operator=(_ConstMemberFuncWrapper &&)      = delete;
     };
 
 private:
@@ -665,13 +699,17 @@ public:
 
     /**
      * @brief 添加一个可调用对象到委托中
+     * @note 当传入对象是同类型 Delegate 时：
+     *       - 内部为空：直接返回；
+     *       - 内部恰好 1 个元素：展开添加该元素的克隆（与单播添加等价）；
+     *       - 内部 ≥2 个元素：作为整体嵌套加入，不展开。
+     *       后一种"不展开"是有意为之，目的是保证 += 与 -= 的对称性：
+     *       后续 `*this -= callable` 仍可按整体匹配并撤销本次添加。
+     *       因此 `b += a; b == a` 在 a 含 ≥2 元素时为 false（Count 不同），
+     *       但 `b += a; b -= a` 后 b 与添加前等价。
      */
     void Add(const ICallable<TRet(Args...)> &callable)
     {
-        // 当添加的可调用对象与当前委托类型相同时（针对单播委托进行优化）：
-        // - 若委托内容为空，则直接返回
-        // - 若委托内容只有一个元素，则克隆该元素并添加到当前委托中
-        // - 否则，直接添加该可调用对象的克隆
         if (callable.GetType() == GetType()) {
             auto &delegate = static_cast<const Delegate &>(callable);
             if (delegate._data.IsEmpty()) {
@@ -698,8 +736,8 @@ public:
      * @brief 添加一个可调用对象到委托中
      */
     template <typename T>
-    typename std::enable_if<!std::is_base_of<_ICallable, T>::value, void>::type
-    Add(const T &callable)
+    auto Add(const T &callable)
+        -> typename std::enable_if<!std::is_base_of<_ICallable, T>::value, void>::type
     {
         _data.Add(new _CallableWrapper<T>(callable));
     }
@@ -731,16 +769,17 @@ public:
     }
 
     /**
-     * @brief  移除一个可调用对象
+     * @brief 移除一个可调用对象
      * @return 如果成功移除则返回true，否则返回false
-     * @note   按照添加顺序从后向前查找，找到第一个匹配的可调用对象并移除
+     * @note 按照添加顺序从后向前查找，找到第一个匹配的可调用对象并移除
+     * @note 与 Add 逻辑严格对称——当传入对象是同类型 Delegate 时：
+     *       - 内部为空：返回 false；
+     *       - 内部恰好 1 个元素：尝试匹配并移除该元素本身；
+     *       - 内部 ≥2 个元素：按整体（嵌套 Delegate）匹配并移除，
+     *         恰好对应 Add 时"不展开整体加入"的行为。
      */
     bool Remove(const ICallable<TRet(Args...)> &callable)
     {
-        // 当移除的可调用对象与当前委托类型相同时（与Add逻辑相对应）：
-        // - 若委托内容为空，则直接返回false
-        // - 若委托内容只有一个元素，则尝试移除该元素
-        // - 否则，直接调用_Remove函数进行移除
         if (callable.GetType() == GetType()) {
             auto &delegate = static_cast<const Delegate &>(callable);
             if (delegate._data.IsEmpty()) {
@@ -753,9 +792,9 @@ public:
     }
 
     /**
-     * @brief  移除一个函数指针
+     * @brief 移除一个函数指针
      * @return 如果成功移除则返回true，否则返回false
-     * @note   按照添加顺序从后向前查找，找到第一个匹配的函数指针并移除
+     * @note 按照添加顺序从后向前查找，找到第一个匹配的函数指针并移除
      */
     bool Remove(TRet (*func)(Args...))
     {
@@ -766,21 +805,21 @@ public:
     }
 
     /**
-     * @brief  移除一个可调用对象
+     * @brief 移除一个可调用对象
      * @return 如果成功移除则返回true，否则返回false
-     * @note   按照添加顺序从后向前查找，找到第一个匹配的可调用对象并移除
+     * @note 按照添加顺序从后向前查找，找到第一个匹配的可调用对象并移除
      */
     template <typename T>
-    typename std::enable_if<!std::is_base_of<_ICallable, T>::value, bool>::type
-    Remove(const T &callable)
+    auto Remove(const T &callable)
+        -> typename std::enable_if<!std::is_base_of<_ICallable, T>::value, bool>::type
     {
         return _Remove(_CallableWrapper<T>(callable));
     }
 
     /**
-     * @brief  移除一个成员函数指针
+     * @brief 移除一个成员函数指针
      * @return 如果成功移除则返回true，否则返回false
-     * @note   按照添加顺序从后向前查找，找到第一个匹配的可调用对象并移除
+     * @note 按照添加顺序从后向前查找，找到第一个匹配的可调用对象并移除
      */
     template <typename T>
     bool Remove(T &obj, TRet (T::*func)(Args...))
@@ -789,9 +828,9 @@ public:
     }
 
     /**
-     * @brief  移除一个常量成员函数指针
+     * @brief 移除一个常量成员函数指针
      * @return 如果成功移除则返回true，否则返回false
-     * @note   按照添加顺序从后向前查找，找到第一个匹配的可调用对象并移除
+     * @note 按照添加顺序从后向前查找，找到第一个匹配的可调用对象并移除
      */
     template <typename T>
     bool Remove(const T &obj, TRet (T::*func)(Args...) const)
@@ -800,10 +839,10 @@ public:
     }
 
     /**
-     * @brief      调用委托，执行所有存储的可调用对象
+     * @brief 调用委托，执行所有存储的可调用对象
      * @param args 函数参数
-     * @return     最后一个可调用对象的返回值
-     * @throw      std::runtime_error 如果委托为空
+     * @return 最后一个可调用对象的返回值
+     * @throw std::runtime_error 如果委托为空
      */
     TRet operator()(Args... args) const
     {
@@ -811,9 +850,9 @@ public:
     }
 
     /**
-     * @brief       判断当前委托是否等于另一个委托
+     * @brief 判断当前委托是否等于另一个委托
      * @param other 另一个委托
-     * @return      如果相等则返回true，否则返回false
+     * @return 如果相等则返回true，否则返回false
      */
     bool operator==(const Delegate &other) const
     {
@@ -821,9 +860,9 @@ public:
     }
 
     /**
-     * @brief       判断当前委托是否不等于另一个委托
+     * @brief 判断当前委托是否不等于另一个委托
      * @param other 另一个委托
-     * @return      如果不相等则返回true，否则返回false
+     * @return 如果不相等则返回true，否则返回false
      */
     bool operator!=(const Delegate &other) const
     {
@@ -831,7 +870,7 @@ public:
     }
 
     /**
-     * @brief  判断当前委托是否等于nullptr
+     * @brief 判断当前委托是否等于nullptr
      * @return 如果委托为空则返回true，否则返回false
      */
     bool operator==(std::nullptr_t) const noexcept
@@ -840,7 +879,7 @@ public:
     }
 
     /**
-     * @brief  判断当前委托是否不等于nullptr
+     * @brief 判断当前委托是否不等于nullptr
      * @return 如果委托不为空则返回true，否则返回false
      */
     bool operator!=(std::nullptr_t) const noexcept
@@ -849,17 +888,17 @@ public:
     }
 
     /**
-     * @brief  判断当前委托是否有效
+     * @brief 判断当前委托是否有效
      * @return 如果委托不为空则返回true，否则返回false
      */
-    operator bool() const noexcept
+    explicit operator bool() const noexcept
     {
         return !_data.IsEmpty();
     }
 
     /**
      * @brief 添加一个可调用对象到委托中
-     * @note  该函数调用Add函数
+     * @note 该函数调用Add函数
      */
     Delegate &operator+=(const ICallable<TRet(Args...)> &callable)
     {
@@ -869,7 +908,7 @@ public:
 
     /**
      * @brief 添加一个函数指针到委托中
-     * @note  该函数调用Add函数
+     * @note 该函数调用Add函数
      */
     Delegate &operator+=(TRet (*func)(Args...))
     {
@@ -879,11 +918,11 @@ public:
 
     /**
      * @brief 添加一个可调用对象到委托中
-     * @note  该函数调用Add函数
+     * @note 该函数调用Add函数
      */
     template <typename T>
-    typename std::enable_if<!std::is_base_of<_ICallable, T>::value, Delegate &>::type
-    operator+=(const T &callable)
+    auto operator+=(const T &callable)
+        -> typename std::enable_if<!std::is_base_of<_ICallable, T>::value, Delegate &>::type
     {
         Add(callable);
         return *this;
@@ -891,7 +930,7 @@ public:
 
     /**
      * @brief 移除一个可调用对象
-     * @note  该函数调用Remove函数
+     * @note 该函数调用Remove函数
      */
     Delegate &operator-=(const ICallable<TRet(Args...)> &callable)
     {
@@ -901,7 +940,7 @@ public:
 
     /**
      * @brief 移除一个函数指针
-     * @note  该函数调用Remove函数
+     * @note 该函数调用Remove函数
      */
     Delegate &operator-=(TRet (*func)(Args...))
     {
@@ -911,21 +950,21 @@ public:
 
     /**
      * @brief 移除一个可调用对象
-     * @note  该函数调用Remove函数
+     * @note 该函数调用Remove函数
      */
     template <typename T>
-    typename std::enable_if<!std::is_base_of<_ICallable, T>::value, Delegate &>::type
-    operator-=(const T &callable)
+    auto operator-=(const T &callable)
+        -> typename std::enable_if<!std::is_base_of<_ICallable, T>::value, Delegate &>::type
     {
         Remove(callable);
         return *this;
     }
 
     /**
-     * @brief      调用委托，执行所有存储的可调用对象
+     * @brief 调用委托，执行所有存储的可调用对象
      * @param args 函数参数
-     * @return     最后一个可调用对象的返回值
-     * @throw      std::runtime_error 如果委托为空
+     * @return 最后一个可调用对象的返回值
+     * @throw std::runtime_error 如果委托为空
      */
     virtual TRet Invoke(Args... args) const override
     {
@@ -933,7 +972,7 @@ public:
     }
 
     /**
-     * @brief  克隆当前委托
+     * @brief 克隆当前委托
      * @return 返回一个新的Delegate对象，包含相同的可调用对象
      */
     virtual ICallable<TRet(Args...)> *Clone() const override
@@ -942,7 +981,7 @@ public:
     }
 
     /**
-     * @brief  获取当前委托的类型信息
+     * @brief 获取当前委托的类型信息
      * @return 返回typeid(Delegate<TRet(Args...)>)
      */
     virtual std::type_index GetType() const override
@@ -951,9 +990,9 @@ public:
     }
 
     /**
-     * @brief       判断当前委托是否与另一个可调用对象相等
+     * @brief 判断当前委托是否与另一个可调用对象相等
      * @param other 另一个可调用对象
-     * @return      如果相等则返回true，否则返回false
+     * @return 如果相等则返回true，否则返回false
      */
     virtual bool Equals(const ICallable<TRet(Args...)> &other) const override
     {
@@ -976,13 +1015,15 @@ public:
     }
 
     /**
-     * @brief      调用所有存储的可调用对象，并返回它们的结果
+     * @brief 调用所有存储的可调用对象，并返回它们的结果
      * @param args 函数参数
-     * @return     返回一个包含所有可调用对象返回值的vector
+     * @return 返回一个包含所有可调用对象返回值的vector
+     * @note 多播调用时，前 N-1 次按左值传参，仅最后一次执行 std::forward，
+     *       避免对 move-only 类型或右值引用形参反复 move 同一对象。
      */
     template <typename U = TRet>
-    typename std::enable_if<!std::is_void<U>::value, std::vector<U>>::type
-    InvokeAll(Args... args) const
+    auto InvokeAll(Args... args) const
+        -> typename std::enable_if<!std::is_void<U>::value, std::vector<U>>::type
     {
         std::vector<U> results;
         size_t count = _data.Count();
@@ -991,15 +1032,12 @@ public:
         } else if (count == 1) {
             results.emplace_back(_data[0]->Invoke(std::forward<Args>(args)...));
         } else {
-#if defined(DELEGATE_DISABLE_SAFEINVOKE)
-            auto &list = _data;
-#else
             auto list = _data;
-#endif
-            results.reserve(count = list.Count());
-            for (size_t i = 0; i < count; ++i) {
-                results.emplace_back(list[i]->Invoke(std::forward<Args>(args)...));
+            results.reserve(count);
+            for (size_t i = 0; i + 1 < count; ++i) {
+                results.emplace_back(list[i]->Invoke(args...));
             }
+            results.emplace_back(list[count - 1]->Invoke(std::forward<Args>(args)...));
         }
         return results;
     }
@@ -1028,6 +1066,8 @@ private:
 
     /**
      * @brief 内部函数，Invoke和operator()的实现
+     * @note 多播调用时，前 N-1 次按左值传参，仅最后一次执行 std::forward，
+     *       避免对 move-only 类型或右值引用形参反复 move 同一对象。
      */
     inline TRet _InvokeImpl(Args... args) const
     {
@@ -1037,13 +1077,9 @@ private:
         } else if (count == 1) {
             return _data[0]->Invoke(std::forward<Args>(args)...);
         } else {
-#if defined(DELEGATE_DISABLE_SAFEINVOKE)
-            auto &list = _data;
-#else
             auto list = _data;
-#endif
-            for (size_t i = 0; i < count - 1; ++i)
-                list[i]->Invoke(std::forward<Args>(args)...);
+            for (size_t i = 0; i + 1 < count; ++i)
+                list[i]->Invoke(args...);
             return list[count - 1]->Invoke(std::forward<Args>(args)...);
         }
     }
@@ -1053,7 +1089,7 @@ private:
 
 /**
  * @brief 比较委托和nullptr
- * @note  如果委托为空则返回true，否则返回false
+ * @note 如果委托为空则返回true，否则返回false
  */
 template <typename TRet, typename... Args>
 inline bool operator==(std::nullptr_t, const Delegate<TRet(Args...)> &d) noexcept
@@ -1063,7 +1099,7 @@ inline bool operator==(std::nullptr_t, const Delegate<TRet(Args...)> &d) noexcep
 
 /**
  * @brief 比较委托和nullptr
- * @note  如果委托不为空则返回true，否则返回false
+ * @note 如果委托不为空则返回true，否则返回false
  */
 template <typename TRet, typename... Args>
 inline bool operator!=(std::nullptr_t, const Delegate<TRet(Args...)> &d) noexcept
@@ -1132,4 +1168,4 @@ struct _FuncTypeHelper<std::tuple<Args...>> {
 template <typename... Types>
 using Func = typename _FuncTypeHelper<typename _FuncTraits<Types...>::TArgsTuple>::template TFunc<typename _FuncTraits<Types...>::TRet>;
 
-#endif // _DELEGATE_H_
+#endif // DELEGATE_H_INCLUDED

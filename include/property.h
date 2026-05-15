@@ -1,5 +1,7 @@
-#ifndef _PROPERTY_H_
-#define _PROPERTY_H_
+#pragma once
+
+#ifndef PROPERTY_H_INCLUDED
+#define PROPERTY_H_INCLUDED
 
 #include <cassert>
 #include <cstddef>
@@ -68,7 +70,7 @@ _SW_DEFINE_OPERATION_HELPER(_LogicOrOperationHelper, ||);
 _SW_DEFINE_UNARY_OPERATION_HELPER(_LogicNotOperationHelper, !);
 _SW_DEFINE_UNARY_OPERATION_HELPER(_BitNotOperationHelper, ~);
 _SW_DEFINE_UNARY_OPERATION_HELPER(_DerefOperationHelper, *);
-_SW_DEFINE_UNARY_OPERATION_HELPER(_AddrOperationHelper, &);
+// _SW_DEFINE_UNARY_OPERATION_HELPER(_AddrOperationHelper, &);
 _SW_DEFINE_UNARY_OPERATION_HELPER(_UnaryPlusOperationHelper, +);
 _SW_DEFINE_UNARY_OPERATION_HELPER(_UnaryMinusOperationHelper, -);
 // _SW_DEFINE_UNARY_OPERATION_HELPER(_PreIncOperationHelper, ++);
@@ -158,21 +160,6 @@ struct _BracketOperationHelper<
 };
 
 /**
- * @brief 判断类型是否可以显式转换的辅助模板
- */
-template <typename TFrom, typename TTo, typename = void>
-struct _IsExplicitlyConvertable : std::false_type {
-};
-
-/**
- * @brief _IsExplicitlyConvertable模板特化
- */
-template <typename TFrom, typename TTo>
-struct _IsExplicitlyConvertable<
-    TFrom, TTo, decltype(void(static_cast<TTo>(std::declval<TFrom>())))> : std::true_type {
-};
-
-/**
  * @brief 判断类型是否有operator->的辅助模板
  */
 template <typename T, typename = void>
@@ -229,7 +216,8 @@ struct FieldsAccessor {
      * @brief 指针类型，直接返回值
      */
     template <typename U = T>
-    typename std::enable_if<std::is_pointer<U>::value, U>::type operator->()
+    auto operator->()
+        -> typename std::enable_if<std::is_pointer<U>::value, U>::type
     {
         return this->value;
     }
@@ -238,7 +226,8 @@ struct FieldsAccessor {
      * @brief 非指针类型，且无operator->，返回值的地址
      */
     template <typename U = T>
-    typename std::enable_if<!std::is_pointer<U>::value && !_HasArrowOperator<U>::value, U *>::type operator->()
+    auto operator->()
+        -> typename std::enable_if<!std::is_pointer<U>::value && !_HasArrowOperator<U>::value, U *>::type
     {
         return &this->value;
     }
@@ -247,7 +236,8 @@ struct FieldsAccessor {
      * @brief 非指针类型，且有operator->，转发operator->
      */
     template <typename U = T>
-    typename std::enable_if<!std::is_pointer<U>::value && _HasArrowOperator<U>::value, typename _HasArrowOperator<U>::type>::type operator->()
+    auto operator->()
+        -> typename std::enable_if<!std::is_pointer<U>::value && _HasArrowOperator<U>::value, typename _HasArrowOperator<U>::type>::type
     {
         return this->value.operator->();
     }
@@ -1038,22 +1028,32 @@ public:
 
     /**
      * @brief 解引用运算
+     * @note 仅在T的operator*返回非引用类型时启用：Get()可能返回临时对象，
+     *       若T的operator*返回引用，将产生悬空引用，因此不允许通过属性的
+     *       operator*直接访问返回引用的重载，应先将Get()的结果保存到变量后再使用。
      */
     template <typename U = T>
     auto operator*() const
-        -> typename std::enable_if<_DerefOperationHelper<U>::value, typename _DerefOperationHelper<U>::type>::type
+        -> typename std::enable_if<
+            _DerefOperationHelper<U>::value &&
+                !std::is_reference<typename _DerefOperationHelper<U>::type>::value,
+            typename _DerefOperationHelper<U>::type>::type
     {
         return *this->Get();
     }
 
     /**
-     * @brief 地址运算
+     * @brief 指针解引用运算
+     * @note T为指针时，Get()返回的指针虽是临时对象，但其指向的内存独立存在，
+     *       故此处即使operator*返回引用也不会产生悬空引用，无需限制返回类型。
      */
     template <typename U = T>
-    auto operator&() const
-        -> typename std::enable_if<_AddrOperationHelper<U>::value, typename _AddrOperationHelper<U>::type>::type
+    auto operator*() const
+        -> typename std::enable_if<
+            _DerefOperationHelper<U>::value && std::is_pointer<T>::value,
+            typename _DerefOperationHelper<U>::type>::type
     {
-        return &this->Get();
+        return *this->Get();
     }
 
     /**
@@ -1198,7 +1198,7 @@ public:
 
     /**
      * @brief 不等于运算
-     * @note  避免与c++20自动生成的!=冲突，通过==取反实现
+     * @note 避免与c++20自动生成的!=冲突，通过==取反实现
      */
     template <typename U>
     auto operator!=(U &&value) const
@@ -1209,7 +1209,7 @@ public:
 
     /**
      * @brief 不等于运算
-     * @note  避免与c++20自动生成的!=冲突，通过==取反实现
+     * @note 避免与c++20自动生成的!=冲突，通过==取反实现
      */
     template <typename D, typename U>
     auto operator!=(const PropertyBase<U, D> &prop) const
@@ -1440,6 +1440,9 @@ public:
 
     /**
      * @brief 下标运算
+     * @note 仅在T的operator[]返回非引用类型时启用：Get()可能返回临时对象，
+     *       若T的operator[]返回引用，将产生悬空引用，因此不允许通过属性的
+     *       operator[]直接访问返回引用的重载，应先将Get()的结果保存到变量后再使用。
      */
     template <typename U>
     auto operator[](U &&value) const
@@ -1453,6 +1456,9 @@ public:
 
     /**
      * @brief 下标运算
+     * @note 仅在T的operator[]返回非引用类型时启用：Get()可能返回临时对象，
+     *       若T的operator[]返回引用，将产生悬空引用，因此不允许通过属性的
+     *       operator[]直接访问返回引用的重载，应先将Get()的结果保存到变量后再使用。
      */
     template <typename D, typename U>
     auto operator[](const PropertyBase<U, D> &prop) const
@@ -1466,6 +1472,8 @@ public:
 
     /**
      * @brief 指针下标运算
+     * @note T为指针时，Get()返回的指针虽是临时对象，但其指向的内存独立存在，
+     *       故此处即使operator[]返回引用也不会产生悬空引用，无需限制返回类型。
      */
     template <typename U>
     auto operator[](U &&value) const
@@ -1478,6 +1486,8 @@ public:
 
     /**
      * @brief 指针下标运算
+     * @note T为指针时，Get()返回的指针虽是临时对象，但其指向的内存独立存在，
+     *       故此处即使operator[]返回引用也不会产生悬空引用，无需限制返回类型。
      */
     template <typename D, typename U>
     auto operator[](const PropertyBase<U, D> &prop) const
@@ -1489,6 +1499,13 @@ public:
     }
 
 protected:
+    /**
+     * @brief 用于存储任意签名函数指针的通用类型
+     * @note 函数指针类型间通过reinterpret_cast互转再转回原类型不丢失信息（C++标准良定义），
+     *       使用统一的函数指针类型作为存储可避免函数指针与void*之间的conditionally-supported转换。
+     */
+    using TFuncPtr = void (*)();
+
     /**
      * @brief 静态属性偏移量标记
      */
@@ -1537,7 +1554,8 @@ public:
      * @brief 获取成员属性初始化器
      */
     template <typename TOwner>
-    static MemberPropertyInitializer<TOwner, T> Init(TOwner *owner)
+    static auto Init(TOwner *owner)
+        -> MemberPropertyInitializer<TOwner, T>
     {
         return MemberPropertyInitializer<TOwner, T>(owner);
     }
@@ -1545,7 +1563,8 @@ public:
     /**
      * @brief 获取静态属性初始化器
      */
-    static StaticPropertyInitializer<T> Init()
+    static auto Init()
+        -> StaticPropertyInitializer<T>
     {
         return StaticPropertyInitializer<T>();
     }
@@ -1615,7 +1634,7 @@ auto operator==(T &&left, const PropertyBase<U, D> &right)
 
 /**
  * @brief 不等于运算
- * @note  避免与c++20自动生成的!=冲突，通过==取反实现
+ * @note 避免与c++20自动生成的!=冲突，通过==取反实现
  */
 template <typename D, typename T, typename U>
 auto operator!=(T &&left, const PropertyBase<U, D> &right)
@@ -1746,6 +1765,7 @@ public:
     using TBase         = PropertyBase<T, Property<T>>;
     using TValue        = typename TBase::TValue;
     using TSetterParam  = typename TBase::TSetterParam;
+    using TFuncPtr      = typename TBase::TFuncPtr;
     using TGetter       = T (*)(void *);
     using TSetter       = void (*)(void *, TSetterParam);
     using TStaticGetter = T (*)();
@@ -1755,12 +1775,12 @@ private:
     /**
      * @brief getter函数指针
      */
-    void *_getter;
+    TFuncPtr _getter;
 
     /**
      * @brief setter函数指针
      */
-    void *_setter;
+    TFuncPtr _setter;
 
 public:
     /**
@@ -1779,8 +1799,8 @@ public:
         assert(initializer._setter != nullptr);
 
         this->SetOwner(initializer._owner);
-        this->_getter = reinterpret_cast<void *>(initializer._getter);
-        this->_setter = reinterpret_cast<void *>(initializer._setter);
+        this->_getter = reinterpret_cast<TFuncPtr>(initializer._getter);
+        this->_setter = reinterpret_cast<TFuncPtr>(initializer._setter);
     }
 
     /**
@@ -1792,8 +1812,8 @@ public:
         assert(initializer._setter != nullptr);
 
         this->SetOwner(nullptr);
-        this->_getter = reinterpret_cast<void *>(initializer._getter);
-        this->_setter = reinterpret_cast<void *>(initializer._setter);
+        this->_getter = reinterpret_cast<TFuncPtr>(initializer._getter);
+        this->_setter = reinterpret_cast<TFuncPtr>(initializer._setter);
     }
 
     /**
@@ -1831,6 +1851,7 @@ public:
     using TBase         = PropertyBase<T, ReadOnlyProperty<T>>;
     using TValue        = typename TBase::TValue;
     using TSetterParam  = typename TBase::TSetterParam;
+    using TFuncPtr      = typename TBase::TFuncPtr;
     using TGetter       = T (*)(void *);
     using TStaticGetter = T (*)();
 
@@ -1838,7 +1859,7 @@ private:
     /**
      * @brief getter函数指针
      */
-    void *_getter;
+    TFuncPtr _getter;
 
 public:
     /**
@@ -1851,7 +1872,7 @@ public:
         assert(initializer._getter != nullptr);
 
         this->SetOwner(initializer._owner);
-        this->_getter = reinterpret_cast<void *>(initializer._getter);
+        this->_getter = reinterpret_cast<TFuncPtr>(initializer._getter);
     }
 
     /**
@@ -1862,7 +1883,7 @@ public:
         assert(initializer._getter != nullptr);
 
         this->SetOwner(nullptr);
-        this->_getter = reinterpret_cast<void *>(initializer._getter);
+        this->_getter = reinterpret_cast<TFuncPtr>(initializer._getter);
     }
 
     /**
@@ -1888,6 +1909,7 @@ public:
     using TBase         = PropertyBase<T, WriteOnlyProperty<T>>;
     using TValue        = typename TBase::TValue;
     using TSetterParam  = typename TBase::TSetterParam;
+    using TFuncPtr      = typename TBase::TFuncPtr;
     using TSetter       = void (*)(void *, TSetterParam);
     using TStaticSetter = void (*)(TSetterParam);
 
@@ -1895,7 +1917,7 @@ private:
     /**
      * @brief setter函数指针
      */
-    void *_setter;
+    TFuncPtr _setter;
 
 public:
     /**
@@ -1913,7 +1935,7 @@ public:
         assert(initializer._setter != nullptr);
 
         this->SetOwner(initializer._owner);
-        this->_setter = reinterpret_cast<void *>(initializer._setter);
+        this->_setter = reinterpret_cast<TFuncPtr>(initializer._setter);
     }
 
     /**
@@ -1924,7 +1946,7 @@ public:
         assert(initializer._setter != nullptr);
 
         this->SetOwner(nullptr);
-        this->_setter = reinterpret_cast<void *>(initializer._setter);
+        this->_setter = reinterpret_cast<TFuncPtr>(initializer._setter);
     }
 
     /**
@@ -1940,4 +1962,4 @@ public:
     }
 };
 
-#endif // _PROPERTY_H_
+#endif // PROPERTY_H_INCLUDED
