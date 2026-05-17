@@ -1,6 +1,6 @@
 # CppSharp
 
-A header-only C++ library that brings C#-style **Delegate** and **Property** patterns to C++.
+A header-only C++ library that brings C#-style **Delegate**, **Property**, and **Event** patterns to C++.
 
 No dependencies, no build step — just drop the headers into your project and `#include` them.
 
@@ -28,6 +28,16 @@ A property abstraction with getter/setter semantics, closely modeled after C# pr
 - **Rich operators** — arithmetic, bitwise, comparison, increment/decrement, subscript, dereference, and compound assignment all work transparently through the property
 - **`operator->`** — access the underlying value's fields without calling `Get()` first
 
+### Event (`event.h`)
+
+An event accessor that exposes a private delegate through a public event, enabling C#-style encapsulated event semantics.
+
+- **Member events** — expose a private delegate via field pointer or getter method on the owner object
+- **Static events** — bind to a global/static delegate via a free function accessor
+- **`+=` / `-=`** — add or remove event handlers, just like C#
+- **`EventArgs`** — a base event arguments struct (extend as needed)
+- **`EventHandler<TSender, TEventArgs>`** — a convenience type alias for `Delegate<void(TSender &, TEventArgs &)>`
+
 ## Quick Start
 
 Clone or copy the `include/` directory into your project, then:
@@ -35,6 +45,7 @@ Clone or copy the `include/` directory into your project, then:
 ```cpp
 #include "delegate.h"
 #include "property.h"
+#include "event.h"
 ```
 
 Requires **C++11** or later.
@@ -243,12 +254,111 @@ Config cfg;
 std::cout << cfg.Values->x << std::endl; // 1
 ```
 
+## Usage — Event
+
+### Basic member event
+
+```cpp
+#include "event.h"
+#include <iostream>
+
+class Button
+{
+    Delegate<void()> _clicked;
+
+public:
+    Event<Delegate<void()>> Clicked{
+        Event<Delegate<void()>>::Init(this)
+            .Delegate<&Button::_clicked>()};
+
+    void Click()
+    {
+        if (_clicked) {
+            _clicked();
+        }
+    }
+};
+
+int main()
+{
+    Button btn;
+    btn.Clicked += []() { std::cout << "Clicked!" << std::endl; };
+    btn.Click(); // prints: Clicked!
+}
+```
+
+### Member function accessor
+
+If the delegate is accessed through a getter method instead of a field:
+
+```cpp
+class Button
+{
+    Delegate<void()> _clicked;
+
+    Delegate<void()> &GetClicked() { return _clicked; }
+
+public:
+    Event<Delegate<void()>> Clicked{
+        Event<Delegate<void()>>::Init(this)
+            .Delegate<&Button::GetClicked>()};
+
+    void Click() { if (_clicked) _clicked(); }
+};
+```
+
+### Static event
+
+```cpp
+Delegate<void()> &GetGlobalDelegate()
+{
+    static Delegate<void()> d;
+    return d;
+}
+
+Event<Delegate<void()>> GlobalClicked{
+    Event<Delegate<void()>>::Init()
+        .Delegate(GetGlobalDelegate)};
+```
+
+### EventHandler with sender and args
+
+```cpp
+class Button
+{
+    EventHandler<Button> _clicked;
+
+public:
+    Event<EventHandler<Button>> Clicked{
+        Event<EventHandler<Button>>::Init(this)
+            .Delegate<&Button::_clicked>()};
+
+    void Click()
+    {
+        if (_clicked) {
+            EventArgs args;
+            _clicked(*this, args);
+        }
+    }
+};
+
+int main()
+{
+    Button btn;
+    btn.Clicked += [](Button &sender, EventArgs &args) {
+        std::cout << "Handled!" << std::endl;
+    };
+    btn.Click(); // prints: Handled!
+}
+```
+
 ## Project Structure
 
 ```text
 include/
     delegate.h    — Delegate, Action, Func, Predicate
     property.h    — Property, ReadOnlyProperty, WriteOnlyProperty
+    event.h       — Event, EventArgs, EventHandler
 ```
 
 ## License
