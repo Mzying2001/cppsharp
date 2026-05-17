@@ -1,23 +1,57 @@
-# cppsharp
+# CppSharp
 
-给 C++ 引入类似 C# 的委托（Delegate）和属性（Property）支持。
+A header-only C++ library that brings C#-style **Delegate** and **Property** patterns to C++.
 
-## [`delegate.h`](./include/delegate.h)
+No dependencies, no build step — just drop the headers into your project and `#include` them.
 
-该头文件为 C++ 提供类似 C# 的委托机制。
+## Features
 
-### 示例
+### Delegate (`delegate.h`)
 
-以下定义了一个 `Button` 类，使用委托定义一个 `Clicked` 事件，通过 `Click` 函数模拟一次按钮点击。`Action` 是 `Delegate<void(Args...)>` 的类型别名，表示无返回值的委托，此外还可以使用 `Func` 表示有返回值的委托，两者的模板参数与 C# 中的 `Action` 和 `Func` 保持一致。
+A multicast delegate that supports storing and invoking multiple callable objects, closely modeled after C# `Delegate`.
+
+- **Multicast** — attach multiple handlers via `+=`, invoke them all with `()`
+- **Type aliases** — `Action<Args...>`, `Func<T1, ..., TResult>`, `Predicate<T>` mirror their C# counterparts
+- **Any callable** — free functions, member functions (const and non-const), lambdas, and functors
+- **Equality** — delegates can be compared (`==`/`!=`) and checked against `nullptr`
+- **Exception-safe** — copy assignment provides strong exception safety guarantee
+
+### Property (`property.h`)
+
+A property abstraction with getter/setter semantics, closely modeled after C# properties.
+
+- **Read-write** — `Property<T>` with both getter and setter
+- **Read-only** — `ReadOnlyProperty<T>` with getter only
+- **Write-only** — `WriteOnlyProperty<T>` with setter only
+- **Member and static** — bind to instance methods or static/free functions
+- **Field binding** — directly bind to a data member as a shortcut
+- **Rich operators** — arithmetic, bitwise, comparison, increment/decrement, subscript, dereference, and compound assignment all work transparently through the property
+- **`operator->`** — access the underlying value's fields without calling `Get()` first
+
+## Quick Start
+
+Clone or copy the `include/` directory into your project, then:
 
 ```cpp
+#include "delegate.h"
+#include "property.h"
+```
+
+Requires **C++11** or later.
+
+## Usage — Delegate
+
+### Basic event pattern
+
+```cpp
+#include "delegate.h"
+#include <iostream>
+
 class Button
 {
 public:
-    // 点击事件
     Action<Button *> Clicked;
 
-    // 模拟点击按钮
     void Click()
     {
         if (Clicked) {
@@ -25,12 +59,8 @@ public:
         }
     }
 };
-```
 
-测试代码如下：
-
-```cpp
-void ClickedHandler(Button *b)
+void OnClick(Button *)
 {
     std::cout << "Button clicked!" << std::endl;
 }
@@ -38,124 +68,189 @@ void ClickedHandler(Button *b)
 int main()
 {
     Button btn;
-
-    // 绑定事件处理函数
-    btn.Clicked += ClickedHandler;
-
-    // 支持多播，这里添加一个lambda处理函数
-    // 委托支持任意可调用对象，包括函数指针、成员函数（通过Add方法）、lambda表达式等
-    btn.Clicked += [](Button *b) {
-        std::cout << "Lambda: Button clicked!" << std::endl;
-    };
-
-    // 模拟点击按钮，触发事件
-    btn.Click();
-
-    // 通过-=操作符移除事件处理函数
-    btn.Clicked -= ClickedHandler;
-
-    // 再次点击按钮
-    btn.Click();
-
-    return 0;
+    btn.Clicked += OnClick;
+    btn.Click(); // prints: Button clicked!
 }
 ```
 
-运行结果：
+### Multicast
 
-```plaintext
-Button clicked!
-Lambda: Button clicked!
-Lambda: Button clicked!
+Multiple handlers can be attached; all of them are invoked in order:
+
+```cpp
+btn.Clicked += OnClick;
+btn.Clicked += [](Button *) {
+    std::cout << "Lambda handler" << std::endl;
+};
+btn.Click();
+// Output:
+//   Button clicked!
+//   Lambda handler
 ```
 
-## [`property.h`](./include/property.h)
+### Removing a handler
 
-该头文件为 C++ 提供类似 C# 的属性语法。
+```cpp
+btn.Clicked -= OnClick; // removes the exact callable
+```
 
-### 示例
+### Member function binding
 
-以下定义了一个 `Person` 类，包含一个可读可写属性 `Age` 以及一个只读属性 `AgeStr`，代码演示了属性的声明和初始化。
+```cpp
+class Logger
+{
+public:
+    void Log(Button *)
+    {
+        std::cout << "Logger::Log" << std::endl;
+    }
+};
+
+Logger logger;
+btn.Clicked.Add(logger, &Logger::Log);
+```
+
+### Func with return value
+
+```cpp
+Func<int, int, int> add;
+add += [](int a, int b) { return a + b; };
+int result = add(3, 4); // result == 7
+```
+
+## Usage — Property
+
+### Basic read-write property
+
+```cpp
+#include "property.h"
+#include <iostream>
+#include <string>
+
+class Person
+{
+    int _age = 0;
+
+public:
+    Property<int> Age{
+        Property<int>::Init(this)
+            .Getter([](Person *self) { return self->_age; })
+            .Setter([](Person *self, int value) {
+                if (value >= 0) self->_age = value;
+            })};
+};
+
+int main()
+{
+    Person p;
+    p.Age = 25;
+    std::cout << p.Age << std::endl; // 25
+}
+```
+
+### Using member functions
 
 ```cpp
 class Person
 {
-    // 属性Age维护的字段
-    int _age = 1;
+    int _age = 0;
 
-    // getter函数
-    int getAge() const
-    {
-        std::cout << "get Age" << std::endl;
-        return _age;
-    }
-
-    // setter函数
-    void setAge(int value)
-    {
-        std::cout << "set Age: " << value << std::endl;
-
-        if (value >= 0) { // 对Age的值进行范围检查
-            _age = value;
-        } else {
-            std::cout << "error: Age can not smaller than 0" << std::endl;
-        }
-    }
+    int getAge() const { return _age; }
+    void setAge(int value) { _age = value; }
 
 public:
-    // 属性Age，通过成员函数初始化
     Property<int> Age{
         Property<int>::Init(this)
             .Getter<&Person::getAge>()
             .Setter<&Person::setAge>()};
+};
+```
 
-    // 只读属性AgeStr，表示Age的字符串
-    // 这里使用lambda表达式初始化，第一个参数即属性所有者对象指针，若有setter同理
-    ReadOnlyProperty<std::string> AgeStr{
-        Property<std::string>::Init(this)
-            .Getter([](Person *self) {
-                std::cout << "get AgeStr" << std::endl;
-                return std::to_string(self->_age);
+### Direct field binding
+
+If no custom logic is needed, bind directly to a data member:
+
+```cpp
+Property<int> Age{
+    Property<int>::Init(this)
+        .Getter<&Person::_age>()
+        .Setter<&Person::_age>()};
+```
+
+### Read-only property
+
+```cpp
+class Circle
+{
+    double _radius = 1.0;
+
+public:
+    ReadOnlyProperty<double> Area{
+        Property<double>::Init(this)
+            .Getter([](Circle *self) {
+                return 3.14159265 * self->_radius * self->_radius;
             })};
 };
 ```
 
-测试代码如下：
+### Static property
 
 ```cpp
-int main()
+class App
 {
-    Person p;
-    std::cout << p.Age << std::endl; // get Age
+    static std::string &nameStorage()
+    {
+        static std::string name = "MyApp";
+        return name;
+    }
 
-    p.Age = -1;                      // error: Age can not smaller than 0
-    std::cout << p.Age << std::endl; // 仍然为1
-
-    p.Age = 10;
-    std::cout << p.AgeStr << std::endl; // 10
-
-    Person p2 = p;                                // 对象可以正常拷贝
-    p2.Age++;                                     // 先get后set
-    std::cout << p2.AgeStr->c_str() << std::endl; // 使用->可以访问属性成员
-
-    return 0;
-}
+public:
+    static Property<std::string> Name{
+        Property<std::string>::Init()
+            .Getter([]() { return nameStorage(); })
+            .Setter([](const std::string &v) { nameStorage() = v; })};
+};
 ```
 
-运行结果：
+### Operator usage
 
-```plaintext
-get Age
-1
-set Age: -1
-error: Age can not smaller than 1
-get Age
-1
-set Age: 10
-get AgeStr
-10
-get Age
-set Age: 11
-get AgeStr
-11
+Properties support arithmetic, comparison, and compound operators:
+
+```cpp
+Person p;
+p.Age = 10;
+p.Age += 5;       // Age is now 15
+p.Age++;          // Age is now 16
+std::cout << p.Age * 2 << std::endl; // 32
 ```
+
+### Accessing fields via `operator->`
+
+```cpp
+class Config
+{
+public:
+    struct Data { int x; int y; };
+    Data _data{1, 2};
+
+    Property<Data> Values{
+        Property<Data>::Init(this)
+            .Getter<&Config::_data>()
+            .Setter<&Config::_data>()};
+};
+
+Config cfg;
+std::cout << cfg.Values->x << std::endl; // 1
+```
+
+## Project Structure
+
+```text
+include/
+    delegate.h    — Delegate, Action, Func, Predicate
+    property.h    — Property, ReadOnlyProperty, WriteOnlyProperty
+```
+
+## License
+
+[MIT](LICENSE)
