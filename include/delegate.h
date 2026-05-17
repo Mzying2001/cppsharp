@@ -13,47 +13,48 @@
 #include <typeindex>
 #include <vector>
 
-// ICallable接口声明
+/*================================================================================*/
+
+/**
+ * Forward declarations
+ */
+
 template <typename>
 struct ICallable;
 
-// Delegate类声明
 template <typename>
 class Delegate;
 
 /*================================================================================*/
 
 /**
- * @brief ICallable接口，用于表示可调用对象的接口
+ * @brief Interface for callable objects.
  */
 template <typename TRet, typename... Args>
 struct ICallable<TRet(Args...)> {
-    /**
-     * @brief 析构函数
-     */
     virtual ~ICallable() = default;
 
     /**
-     * @brief 调用函数
-     * @param args 函数参数
-     * @return 函数返回值
+     * @brief Invokes the callable object.
+     * @param args Arguments to forward to the callable.
+     * @return The return value of the callable.
      */
     virtual TRet Invoke(Args... args) const = 0;
 
     /**
-     * @brief 克隆当前可调用对象
+     * @brief Creates a copy of this callable object.
      */
     virtual ICallable *Clone() const = 0;
 
     /**
-     * @brief 获取当前可调用对象的类型信息
+     * @brief Returns the type information of the wrapped callable.
      */
     virtual std::type_index GetType() const = 0;
 
     /**
-     * @brief 判断当前可调用对象是否与另一个可调用对象相等
-     * @param other 另一个可调用对象
-     * @return 如果相等则返回true，否则返回false
+     * @brief Checks whether this callable is equal to another.
+     * @param other The callable to compare against.
+     * @return true if the two callables are equal, false otherwise.
      */
     virtual bool Equals(const ICallable &other) const = 0;
 };
@@ -61,55 +62,38 @@ struct ICallable<TRet(Args...)> {
 /*================================================================================*/
 
 /**
- * @brief 用于存储和管理多个可调用对象的列表，针对单个可调用对象的情况进行优化
+ * @brief Stores and manages multiple callable objects, optimized for the single-callable case.
  */
 template <typename T>
 class CallableList
 {
 public:
-    /**
-     * @brief 可调用对象类型别名
-     */
-    using TCallable = ICallable<T>;
-
-    /**
-     * @brief 智能指针类型别名，用于存储可调用对象的唯一指针
-     */
-    using TSinglePtr = std::unique_ptr<TCallable>;
-
-    /**
-     * @brief 列表类型别名，用于存储多个可调用对象的智能指针
-     */
+    using TCallable   = ICallable<T>;
+    using TSinglePtr  = std::unique_ptr<TCallable>;
     using TSharedList = std::vector<std::shared_ptr<TCallable>>;
 
 private:
-    /**
-     * @brief 内部存储可调用对象的联合体
-     */
     mutable union {
         alignas(TSinglePtr) uint8_t _single[sizeof(TSinglePtr)];
         alignas(TSharedList) uint8_t _list[sizeof(TSharedList)];
     } _data = {};
 
-    /**
-     * @brief 当前状态枚举
-     */
     enum : uint8_t {
-        STATE_NONE,   ///< 未存储任何可调用对象
-        STATE_SINGLE, ///< 储存了一个可调用对象
-        STATE_LIST,   ///< 储存了多个可调用对象
+        STATE_NONE,   ///< No callable stored
+        STATE_SINGLE, ///< Exactly one callable stored
+        STATE_LIST,   ///< Multiple callables stored
     } _state = STATE_NONE;
 
 public:
     /**
-     * @brief 默认构造函数
+     * @brief Default constructor.
      */
     CallableList()
     {
     }
 
     /**
-     * @brief 拷贝构造函数
+     * @brief Copy constructor.
      */
     CallableList(const CallableList &other)
     {
@@ -117,7 +101,7 @@ public:
     }
 
     /**
-     * @brief 移动构造函数
+     * @brief Move constructor.
      */
     CallableList(CallableList &&other) noexcept
     {
@@ -125,10 +109,9 @@ public:
     }
 
     /**
-     * @brief 拷贝赋值运算
-     * @note 强异常安全：先在本地完成可能抛异常的 Clone / vector 拷贝，
-     *       全部成功后再原子地切换 *this 的状态。提交阶段（_Reset(state) 与
-     *       unique_ptr/vector 的移动赋值）均为 noexcept，不会导致中间不一致。
+     * @brief Copy assignment with strong exception safety.
+     * @note All potentially-throwing work (Clone / vector copy) is done first;
+     *       the commit phase (_Reset + pointer/vector move-assignment) is noexcept.
      */
     CallableList &operator=(const CallableList &other)
     {
@@ -158,7 +141,7 @@ public:
     }
 
     /**
-     * @brief 移动赋值运算
+     * @brief Move assignment.
      */
     CallableList &operator=(CallableList &&other) noexcept
     {
@@ -187,7 +170,7 @@ public:
     }
 
     /**
-     * @brief 析构函数
+     * @brief Destructor.
      */
     ~CallableList()
     {
@@ -195,8 +178,8 @@ public:
     }
 
     /**
-     * @brief 获取当前存储的可调用对象数量
-     * @return 可调用对象的数量
+     * @brief Returns the number of stored callables.
+     * @return The number of callables.
      */
     size_t Count() const noexcept
     {
@@ -214,8 +197,8 @@ public:
     }
 
     /**
-     * @brief 判断当前存储的可调用对象是否为空
-     * @return 如果没有存储任何可调用对象则返回true，否则返回false
+     * @brief Checks whether no callables are stored.
+     * @return true if empty, false otherwise.
      */
     bool IsEmpty() const noexcept
     {
@@ -223,7 +206,7 @@ public:
     }
 
     /**
-     * @brief 清空当前存储的可调用对象
+     * @brief Removes all stored callables.
      */
     void Clear() noexcept
     {
@@ -231,14 +214,16 @@ public:
     }
 
     /**
-     * @brief 添加一个可调用对象到列表中
-     * @note 传入对象的生命周期将由CallableList管理
-     * @note 异常安全：
-     *       - SINGLE→LIST 升级时使用 reserve(2) 避免后续 emplace_back 触发扩容，
-     *         此时唯一的失败路径是 shared_ptr 控制块分配失败，shared_ptr 构造函数
-     *         保证抛异常时自动 delete 传入的裸指针。
-     *       - STATE_LIST 分支先把裸指针转交给本地 shared_ptr，再 emplace_back，
-     *         即使 vector 扩容失败，本地 shared_ptr 析构时也会正确释放对象。
+     * @brief Adds a callable to the list.
+     * @note Ownership of the raw pointer is transferred to the CallableList.
+     * @note Exception safety:
+     *       - SINGLE->LIST upgrade uses reserve(2) to avoid reallocation during
+     *         emplace_back; the only failure path is shared_ptr control-block
+     *         allocation, where the shared_ptr constructor guarantees the raw
+     *         pointer is deleted on exception.
+     *       - STATE_LIST branch wraps the raw pointer in a local shared_ptr
+     *         first; even if vector reallocation fails, the local shared_ptr
+     *         destructor correctly frees the object.
      */
     void Add(TCallable *callable)
     {
@@ -270,8 +255,8 @@ public:
     }
 
     /**
-     * @brief 移除指定索引处的可调用对象
-     * @return 如果成功移除则返回true，否则返回false
+     * @brief Removes the callable at the specified index.
+     * @return true if the element was removed, false otherwise.
      */
     bool RemoveAt(size_t index) noexcept
     {
@@ -293,9 +278,11 @@ public:
                 if (list.empty()) {
                     _Reset();
                 }
-                // 注：LIST 仅剩 1 元素时不降级回 SINGLE。shared_ptr 无法转移给
-                // unique_ptr，强行 Clone 反而带来额外开销，保留 LIST 单元素状态
-                // 在功能与性能上都可接受。
+                // Note: when the list shrinks to one element we do NOT downgrade
+                // back to SINGLE.  shared_ptr cannot be moved into unique_ptr,
+                // and a forced Clone would add unnecessary overhead.  Keeping a
+                // single-element LIST state is acceptable both functionally and
+                // performance-wise.
                 return true;
             }
             default: {
@@ -305,8 +292,8 @@ public:
     }
 
     /**
-     * @brief 获取指定索引处的可调用对象
-     * @return 如果索引有效则返回对应的可调用对象，否则返回nullptr
+     * @brief Returns the callable at the specified index.
+     * @return Pointer to the callable, or nullptr if the index is out of range.
      */
     TCallable *GetAt(size_t index) const noexcept
     {
@@ -325,8 +312,8 @@ public:
     }
 
     /**
-     * @brief 获取指定索引处的可调用对象
-     * @return 如果索引有效则返回对应的可调用对象，否则返回nullptr
+     * @brief Returns the callable at the specified index.
+     * @return Pointer to the callable, or nullptr if the index is out of range.
      */
     TCallable *operator[](size_t index) const noexcept
     {
@@ -335,7 +322,7 @@ public:
 
 private:
     /**
-     * @brief 内部函数，当状态为STATE_SINGLE时返回单个可调用对象的引用，
+     * @brief Returns a reference to the single callable (valid only in STATE_SINGLE).
      */
     constexpr TSinglePtr &_GetSingle() const noexcept
     {
@@ -343,7 +330,7 @@ private:
     }
 
     /**
-     * @brief 内部函数，当状态为STATE_LIST时返回可调用对象列表的引用
+     * @brief Returns a reference to the callable list (valid only in STATE_LIST).
      */
     constexpr TSharedList &_GetList() const noexcept
     {
@@ -351,7 +338,7 @@ private:
     }
 
     /**
-     * @brief 重置当前状态，释放存储的可调用对象
+     * @brief Destroys the stored callable(s) and resets to STATE_NONE.
      */
     void _Reset() noexcept
     {
@@ -373,7 +360,7 @@ private:
     }
 
     /**
-     * @brief 重置当前状态并根据给定状态进行初始化
+     * @brief Destroys current state and re-initializes to the given state.
      */
     void _Reset(uint8_t state) noexcept
     {
@@ -397,7 +384,8 @@ private:
 /*================================================================================*/
 
 /**
- * @brief 委托类，类似于C#中的委托，支持存储和调用任意可调用对象
+ * @brief Multicast delegate similar to C# Delegate, capable of storing and
+ *        invoking one or more callable objects.
  */
 template <typename TRet, typename... Args>
 class Delegate<TRet(Args...)> final : public ICallable<TRet(Args...)>
@@ -499,8 +487,9 @@ private:
         }
 
     public:
-        // 禁用拷贝/移动：默认实现会按字节拷贝 _storage，不会调用 T 的构造函数，
-        // 对非平凡可拷贝类型会破坏不变式。需要克隆请走 Clone()。
+        // Disable copy/move: the default implementation would byte-copy _storage
+        // without calling T's constructor, breaking invariants for non-trivial types.
+        // Use Clone() instead.
         _CallableWrapperImpl(const _CallableWrapperImpl &)            = delete;
         _CallableWrapperImpl(_CallableWrapperImpl &&)                 = delete;
         _CallableWrapperImpl &operator=(const _CallableWrapperImpl &) = delete;
@@ -546,7 +535,7 @@ private:
         }
 
     public:
-        // 禁用拷贝/移动：与 _CallableWrapperImpl 保持一致，需要克隆请走 Clone()。
+        // Disable copy/move — consistent with _CallableWrapperImpl. Use Clone().
         _MemberFuncWrapper(const _MemberFuncWrapper &)            = delete;
         _MemberFuncWrapper(_MemberFuncWrapper &&)                 = delete;
         _MemberFuncWrapper &operator=(const _MemberFuncWrapper &) = delete;
@@ -589,7 +578,7 @@ private:
         }
 
     public:
-        // 禁用拷贝/移动：与 _CallableWrapperImpl 保持一致，需要克隆请走 Clone()。
+        // Disable copy/move — consistent with _CallableWrapperImpl. Use Clone().
         _ConstMemberFuncWrapper(const _ConstMemberFuncWrapper &)            = delete;
         _ConstMemberFuncWrapper(_ConstMemberFuncWrapper &&)                 = delete;
         _ConstMemberFuncWrapper &operator=(const _ConstMemberFuncWrapper &) = delete;
@@ -597,21 +586,18 @@ private:
     };
 
 private:
-    /**
-     * @brief 内部存储可调用对象的容器
-     */
     CallableList<TRet(Args...)> _data;
 
 public:
     /**
-     * @brief 默认构造函数
+     * @brief Default constructor; creates an empty delegate.
      */
     Delegate(std::nullptr_t = nullptr)
     {
     }
 
     /**
-     * @brief 构造函数，接受一个可调用对象
+     * @brief Constructs a delegate from an ICallable object.
      */
     Delegate(const ICallable<TRet(Args...)> &callable)
     {
@@ -619,7 +605,7 @@ public:
     }
 
     /**
-     * @brief 构造函数，接受一个函数指针
+     * @brief Constructs a delegate from a function pointer.
      */
     Delegate(TRet (*func)(Args...))
     {
@@ -627,7 +613,7 @@ public:
     }
 
     /**
-     * @brief 构造函数，接受一个可调用对象
+     * @brief Constructs a delegate from a callable object.
      */
     template <typename T, typename std::enable_if<!std::is_base_of<_ICallable, T>::value, int>::type = 0>
     Delegate(const T &callable)
@@ -636,7 +622,7 @@ public:
     }
 
     /**
-     * @brief 构造函数，接受一个成员函数指针
+     * @brief Constructs a delegate bound to a member function.
      */
     template <typename T>
     Delegate(T &obj, TRet (T::*func)(Args...))
@@ -645,7 +631,7 @@ public:
     }
 
     /**
-     * @brief 构造函数，接受一个常量成员函数指针
+     * @brief Constructs a delegate bound to a const member function.
      */
     template <typename T>
     Delegate(const T &obj, TRet (T::*func)(Args...) const)
@@ -654,7 +640,7 @@ public:
     }
 
     /**
-     * @brief 拷贝构造函数
+     * @brief Copy constructor; deep-copies all callables.
      */
     Delegate(const Delegate &other)
     {
@@ -664,7 +650,7 @@ public:
     }
 
     /**
-     * @brief 移动构造函数
+     * @brief Move constructor.
      */
     Delegate(Delegate &&other) noexcept
         : _data(std::move(other._data))
@@ -672,7 +658,7 @@ public:
     }
 
     /**
-     * @brief 拷贝赋值运算符
+     * @brief Copy assignment; deep-copies all callables from @p other.
      */
     Delegate &operator=(const Delegate &other)
     {
@@ -687,7 +673,7 @@ public:
     }
 
     /**
-     * @brief 移动赋值运算符
+     * @brief Move assignment.
      */
     Delegate &operator=(Delegate &&other) noexcept
     {
@@ -698,15 +684,16 @@ public:
     }
 
     /**
-     * @brief 添加一个可调用对象到委托中
-     * @note 当传入对象是同类型 Delegate 时：
-     *       - 内部为空：直接返回；
-     *       - 内部恰好 1 个元素：展开添加该元素的克隆（与单播添加等价）；
-     *       - 内部 ≥2 个元素：作为整体嵌套加入，不展开。
-     *       后一种"不展开"是有意为之，目的是保证 += 与 -= 的对称性：
-     *       后续 `*this -= callable` 仍可按整体匹配并撤销本次添加。
-     *       因此 `b += a; b == a` 在 a 含 ≥2 元素时为 false（Count 不同），
-     *       但 `b += a; b -= a` 后 b 与添加前等价。
+     * @brief Adds a callable to this delegate.
+     * @note When the argument is a Delegate of the same type:
+     *       - Empty delegate: no-op.
+     *       - Exactly one element: the inner element is cloned and added
+     *         directly (equivalent to single-cast add).
+     *       - Two or more elements: the delegate is added as a nested whole
+     *         without flattening.  This preserves add/remove symmetry so that
+     *         `*this -= callable` can still match and undo the add.  Therefore
+     *         `b += a; b == a` is false when a has >=2 elements (different
+     *         count), but `b += a; b -= a` restores b to its original state.
      */
     void Add(const ICallable<TRet(Args...)> &callable)
     {
@@ -723,7 +710,7 @@ public:
     }
 
     /**
-     * @brief 添加一个函数指针到委托中
+     * @brief Adds a function pointer to this delegate.
      */
     void Add(TRet (*func)(Args...))
     {
@@ -733,7 +720,7 @@ public:
     }
 
     /**
-     * @brief 添加一个可调用对象到委托中
+     * @brief Adds a callable object to this delegate.
      */
     template <typename T>
     auto Add(const T &callable)
@@ -743,7 +730,7 @@ public:
     }
 
     /**
-     * @brief 添加一个成员函数指针到委托中
+     * @brief Adds a member function pointer to this delegate.
      */
     template <typename T>
     void Add(T &obj, TRet (T::*func)(Args...))
@@ -752,7 +739,7 @@ public:
     }
 
     /**
-     * @brief 添加一个常量成员函数指针到委托中
+     * @brief Adds a const member function pointer to this delegate.
      */
     template <typename T>
     void Add(const T &obj, TRet (T::*func)(Args...) const)
@@ -761,7 +748,7 @@ public:
     }
 
     /**
-     * @brief 清空委托中的所有可调用对象
+     * @brief Removes all callables from this delegate.
      */
     void Clear()
     {
@@ -769,14 +756,14 @@ public:
     }
 
     /**
-     * @brief 移除一个可调用对象
-     * @return 如果成功移除则返回true，否则返回false
-     * @note 按照添加顺序从后向前查找，找到第一个匹配的可调用对象并移除
-     * @note 与 Add 逻辑严格对称——当传入对象是同类型 Delegate 时：
-     *       - 内部为空：返回 false；
-     *       - 内部恰好 1 个元素：尝试匹配并移除该元素本身；
-     *       - 内部 ≥2 个元素：按整体（嵌套 Delegate）匹配并移除，
-     *         恰好对应 Add 时"不展开整体加入"的行为。
+     * @brief Removes a callable from this delegate.
+     * @return true if a matching callable was found and removed, false otherwise.
+     * @note Searches from the most-recently-added callable backward.
+     *       Symmetric with Add — when the argument is a Delegate of the same type:
+     *       - Empty delegate: returns false.
+     *       - Exactly one element: attempts to match and remove that element itself.
+     *       - Two or more elements: matches and removes the delegate as a nested
+     *         whole, mirroring the non-flattening behavior of Add.
      */
     bool Remove(const ICallable<TRet(Args...)> &callable)
     {
@@ -792,9 +779,9 @@ public:
     }
 
     /**
-     * @brief 移除一个函数指针
-     * @return 如果成功移除则返回true，否则返回false
-     * @note 按照添加顺序从后向前查找，找到第一个匹配的函数指针并移除
+     * @brief Removes a function pointer from this delegate.
+     * @return true if a matching function pointer was found and removed, false otherwise.
+     * @note Searches from the most-recently-added callable backward.
      */
     bool Remove(TRet (*func)(Args...))
     {
@@ -805,9 +792,9 @@ public:
     }
 
     /**
-     * @brief 移除一个可调用对象
-     * @return 如果成功移除则返回true，否则返回false
-     * @note 按照添加顺序从后向前查找，找到第一个匹配的可调用对象并移除
+     * @brief Removes a callable object from this delegate.
+     * @return true if a matching callable was found and removed, false otherwise.
+     * @note Searches from the most-recently-added callable backward.
      */
     template <typename T>
     auto Remove(const T &callable)
@@ -817,9 +804,9 @@ public:
     }
 
     /**
-     * @brief 移除一个成员函数指针
-     * @return 如果成功移除则返回true，否则返回false
-     * @note 按照添加顺序从后向前查找，找到第一个匹配的可调用对象并移除
+     * @brief Removes a member function pointer from this delegate.
+     * @return true if a matching callable was found and removed, false otherwise.
+     * @note Searches from the most-recently-added callable backward.
      */
     template <typename T>
     bool Remove(T &obj, TRet (T::*func)(Args...))
@@ -828,9 +815,9 @@ public:
     }
 
     /**
-     * @brief 移除一个常量成员函数指针
-     * @return 如果成功移除则返回true，否则返回false
-     * @note 按照添加顺序从后向前查找，找到第一个匹配的可调用对象并移除
+     * @brief Removes a const member function pointer from this delegate.
+     * @return true if a matching callable was found and removed, false otherwise.
+     * @note Searches from the most-recently-added callable backward.
      */
     template <typename T>
     bool Remove(const T &obj, TRet (T::*func)(Args...) const)
@@ -839,10 +826,10 @@ public:
     }
 
     /**
-     * @brief 调用委托，执行所有存储的可调用对象
-     * @param args 函数参数
-     * @return 最后一个可调用对象的返回值
-     * @throw std::runtime_error 如果委托为空
+     * @brief Invokes all stored callables.
+     * @param args Arguments forwarded to each callable.
+     * @return The return value of the last callable.
+     * @throw std::runtime_error if the delegate is empty.
      */
     TRet operator()(Args... args) const
     {
@@ -850,9 +837,9 @@ public:
     }
 
     /**
-     * @brief 判断当前委托是否等于另一个委托
-     * @param other 另一个委托
-     * @return 如果相等则返回true，否则返回false
+     * @brief Checks whether this delegate is equal to another.
+     * @param other The delegate to compare against.
+     * @return true if both delegates contain the same callables in the same order.
      */
     bool operator==(const Delegate &other) const
     {
@@ -860,9 +847,9 @@ public:
     }
 
     /**
-     * @brief 判断当前委托是否不等于另一个委托
-     * @param other 另一个委托
-     * @return 如果不相等则返回true，否则返回false
+     * @brief Checks whether this delegate is not equal to another.
+     * @param other The delegate to compare against.
+     * @return true if the delegates differ, false otherwise.
      */
     bool operator!=(const Delegate &other) const
     {
@@ -870,8 +857,8 @@ public:
     }
 
     /**
-     * @brief 判断当前委托是否等于nullptr
-     * @return 如果委托为空则返回true，否则返回false
+     * @brief Checks whether this delegate is null (empty).
+     * @return true if the delegate has no callables, false otherwise.
      */
     bool operator==(std::nullptr_t) const noexcept
     {
@@ -879,8 +866,8 @@ public:
     }
 
     /**
-     * @brief 判断当前委托是否不等于nullptr
-     * @return 如果委托不为空则返回true，否则返回false
+     * @brief Checks whether this delegate is not null (non-empty).
+     * @return true if the delegate has at least one callable, false otherwise.
      */
     bool operator!=(std::nullptr_t) const noexcept
     {
@@ -888,8 +875,7 @@ public:
     }
 
     /**
-     * @brief 判断当前委托是否有效
-     * @return 如果委托不为空则返回true，否则返回false
+     * @brief Explicit bool conversion; returns true if the delegate is non-empty.
      */
     explicit operator bool() const noexcept
     {
@@ -897,8 +883,7 @@ public:
     }
 
     /**
-     * @brief 添加一个可调用对象到委托中
-     * @note 该函数调用Add函数
+     * @brief Adds a callable to this delegate (delegates to Add).
      */
     Delegate &operator+=(const ICallable<TRet(Args...)> &callable)
     {
@@ -907,8 +892,7 @@ public:
     }
 
     /**
-     * @brief 添加一个函数指针到委托中
-     * @note 该函数调用Add函数
+     * @brief Adds a function pointer to this delegate (delegates to Add).
      */
     Delegate &operator+=(TRet (*func)(Args...))
     {
@@ -917,8 +901,7 @@ public:
     }
 
     /**
-     * @brief 添加一个可调用对象到委托中
-     * @note 该函数调用Add函数
+     * @brief Adds a callable object to this delegate (delegates to Add).
      */
     template <typename T>
     auto operator+=(const T &callable)
@@ -929,8 +912,7 @@ public:
     }
 
     /**
-     * @brief 移除一个可调用对象
-     * @note 该函数调用Remove函数
+     * @brief Removes a callable from this delegate (delegates to Remove).
      */
     Delegate &operator-=(const ICallable<TRet(Args...)> &callable)
     {
@@ -939,8 +921,7 @@ public:
     }
 
     /**
-     * @brief 移除一个函数指针
-     * @note 该函数调用Remove函数
+     * @brief Removes a function pointer from this delegate (delegates to Remove).
      */
     Delegate &operator-=(TRet (*func)(Args...))
     {
@@ -949,8 +930,7 @@ public:
     }
 
     /**
-     * @brief 移除一个可调用对象
-     * @note 该函数调用Remove函数
+     * @brief Removes a callable object from this delegate (delegates to Remove).
      */
     template <typename T>
     auto operator-=(const T &callable)
@@ -961,10 +941,10 @@ public:
     }
 
     /**
-     * @brief 调用委托，执行所有存储的可调用对象
-     * @param args 函数参数
-     * @return 最后一个可调用对象的返回值
-     * @throw std::runtime_error 如果委托为空
+     * @brief Invokes all stored callables.
+     * @param args Arguments forwarded to each callable.
+     * @return The return value of the last callable.
+     * @throw std::runtime_error if the delegate is empty.
      */
     virtual TRet Invoke(Args... args) const override
     {
@@ -972,8 +952,8 @@ public:
     }
 
     /**
-     * @brief 克隆当前委托
-     * @return 返回一个新的Delegate对象，包含相同的可调用对象
+     * @brief Creates a deep copy of this delegate.
+     * @return A new Delegate containing cloned copies of all callables.
      */
     virtual ICallable<TRet(Args...)> *Clone() const override
     {
@@ -981,8 +961,8 @@ public:
     }
 
     /**
-     * @brief 获取当前委托的类型信息
-     * @return 返回typeid(Delegate<TRet(Args...)>)
+     * @brief Returns the type information for this delegate.
+     * @return typeid(Delegate<TRet(Args...)>).
      */
     virtual std::type_index GetType() const override
     {
@@ -990,9 +970,9 @@ public:
     }
 
     /**
-     * @brief 判断当前委托是否与另一个可调用对象相等
-     * @param other 另一个可调用对象
-     * @return 如果相等则返回true，否则返回false
+     * @brief Checks whether this delegate equals another callable.
+     * @param other The callable to compare against.
+     * @return true if both delegates contain the same callables in the same order.
      */
     virtual bool Equals(const ICallable<TRet(Args...)> &other) const override
     {
@@ -1015,11 +995,13 @@ public:
     }
 
     /**
-     * @brief 调用所有存储的可调用对象，并返回它们的结果
-     * @param args 函数参数
-     * @return 返回一个包含所有可调用对象返回值的vector
-     * @note 多播调用时，前 N-1 次按左值传参，仅最后一次执行 std::forward，
-     *       避免对 move-only 类型或右值引用形参反复 move 同一对象。
+     * @brief Invokes all stored callables and collects their return values.
+     * @param args Arguments forwarded to each callable.
+     * @return A vector containing the return value of each callable.
+     * @note During multicast invocation the first N-1 callables receive args as
+     *       lvalues; only the last invocation uses std::forward.  This avoids
+     *       repeatedly moving the same object when dealing with move-only types
+     *       or rvalue-reference parameters.
      */
     template <typename U = TRet>
     auto InvokeAll(Args... args) const
@@ -1044,7 +1026,7 @@ public:
 
 private:
     /**
-     * @brief 内部函数，用于从后向前查找并移除一个可调用对象
+     * @brief Searches backward for the first callable equal to the given one and removes it.
      */
     bool _Remove(const _ICallable &callable)
     {
@@ -1057,7 +1039,7 @@ private:
     }
 
     /**
-     * @brief 内部函数，调用空委托时抛出异常
+     * @brief Throws a runtime error indicating the delegate is empty.
      */
     [[noreturn]] void _ThrowEmptyDelegateError() const
     {
@@ -1065,9 +1047,9 @@ private:
     }
 
     /**
-     * @brief 内部函数，Invoke和operator()的实现
-     * @note 多播调用时，前 N-1 次按左值传参，仅最后一次执行 std::forward，
-     *       避免对 move-only 类型或右值引用形参反复 move 同一对象。
+     * @brief Shared implementation for Invoke() and operator().
+     * @note During multicast invocation the first N-1 callables receive args as
+     *       lvalues; only the last invocation uses std::forward.
      */
     inline TRet _InvokeImpl(Args... args) const
     {
@@ -1088,8 +1070,8 @@ private:
 /*================================================================================*/
 
 /**
- * @brief 比较委托和nullptr
- * @note 如果委托为空则返回true，否则返回false
+ * @brief Compares nullptr with a delegate for equality.
+ * @return true if the delegate is empty, false otherwise.
  */
 template <typename TRet, typename... Args>
 inline bool operator==(std::nullptr_t, const Delegate<TRet(Args...)> &d) noexcept
@@ -1098,8 +1080,8 @@ inline bool operator==(std::nullptr_t, const Delegate<TRet(Args...)> &d) noexcep
 }
 
 /**
- * @brief 比较委托和nullptr
- * @note 如果委托不为空则返回true，否则返回false
+ * @brief Compares nullptr with a delegate for inequality.
+ * @return true if the delegate is non-empty, false otherwise.
  */
 template <typename TRet, typename... Args>
 inline bool operator!=(std::nullptr_t, const Delegate<TRet(Args...)> &d) noexcept
@@ -1110,13 +1092,13 @@ inline bool operator!=(std::nullptr_t, const Delegate<TRet(Args...)> &d) noexcep
 /*================================================================================*/
 
 /**
- * @brief Action类型别名，表示无返回值的委托
+ * @brief Type alias for a void-returning delegate (similar to C# Action).
  */
 template <typename... Args>
 using Action = Delegate<void(Args...)>;
 
 /**
- * @brief Predicate类型别名，表示返回bool的单参数委托
+ * @brief Type alias for a single-parameter bool-returning delegate (similar to C# Predicate).
  */
 template <typename T>
 using Predicate = Delegate<bool(T)>;
@@ -1124,13 +1106,13 @@ using Predicate = Delegate<bool(T)>;
 /*================================================================================*/
 
 /**
- * @brief _FuncTraits模板，用于提取函数类型的返回值和参数类型
+ * @brief Helper to extract return type and argument types from a variadic type list.
  */
 template <typename...>
 struct _FuncTraits;
 
 /**
- * @brief _FuncTraits特化
+ * @brief Base case: the last type is the return type.
  */
 template <typename Last>
 struct _FuncTraits<Last> {
@@ -1139,7 +1121,7 @@ struct _FuncTraits<Last> {
 };
 
 /**
- * @brief _FuncTraits特化
+ * @brief Recursive case: accumulate argument types and forward the return type.
  */
 template <typename First, typename... Rest>
 struct _FuncTraits<First, Rest...> {
@@ -1148,13 +1130,13 @@ struct _FuncTraits<First, Rest...> {
 };
 
 /**
- * @brief _FuncTypeHelper模板，用于根据参数元组生成对应的Func类型
+ * @brief Maps an argument tuple to a Delegate type.
  */
 template <typename TArgsTuple>
 struct _FuncTypeHelper;
 
 /**
- * @brief _FuncTypeHelper特化
+ * @brief Specialization that unpacks the tuple into a Delegate parameter list.
  */
 template <typename... Args>
 struct _FuncTypeHelper<std::tuple<Args...>> {
@@ -1163,7 +1145,7 @@ struct _FuncTypeHelper<std::tuple<Args...>> {
 };
 
 /**
- * @brief Func类型别名，类似C#中的Func<T1, T2, ..., TResult>
+ * @brief Type alias similar to C# Func<T1, T2, ..., TResult>.
  */
 template <typename... Types>
 using Func = typename _FuncTypeHelper<typename _FuncTraits<Types...>::TArgsTuple>::template TFunc<typename _FuncTraits<Types...>::TRet>;

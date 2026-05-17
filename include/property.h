@@ -10,6 +10,8 @@
 #include <type_traits>
 #include <utility>
 
+/*================================================================================*/
+
 #define _SW_DEFINE_OPERATION_HELPER(NAME, OP)                                                    \
     template <typename T, typename U, typename = void>                                           \
     struct NAME : std::false_type {                                                              \
@@ -31,7 +33,7 @@
 /*================================================================================*/
 
 /**
- * 向前声明
+ * Forward declarations
  */
 
 template <typename T, typename TDerived>
@@ -77,7 +79,7 @@ _SW_DEFINE_UNARY_OPERATION_HELPER(_UnaryMinusOperationHelper, -);
 // _SW_DEFINE_UNARY_OPERATION_HELPER(_PreDecOperationHelper, --);
 
 /**
- * @brief _IsProperty的实现
+ * @brief Implementation detail for _IsProperty.
  */
 template <typename T>
 struct _IsPropertyImpl {
@@ -91,21 +93,21 @@ public:
 };
 
 /**
- * @brief 判断类型是否为属性的辅助模板
+ * @brief Checks whether a type is a property type.
  */
 template <typename T>
 struct _IsProperty : _IsPropertyImpl<typename std::decay<T>::type>::type {
 };
 
 /**
- * @brief 判断类型是否有GetterImpl成员的辅助模板
+ * @brief Checks whether a type has a GetterImpl member.
  */
 template <typename, typename = void>
 struct _HasGetterImpl : std::false_type {
 };
 
 /**
- * @brief _HasGetterImpl模板特化
+ * @brief Specialization for types that have a GetterImpl member.
  */
 template <typename T>
 struct _HasGetterImpl<
@@ -113,14 +115,14 @@ struct _HasGetterImpl<
 };
 
 /**
- * @brief 判断类型是否有SetterImpl成员的辅助模板
+ * @brief Checks whether a type has a SetterImpl member.
  */
 template <typename, typename = void>
 struct _HasSetterImpl : std::false_type {
 };
 
 /**
- * @brief _HasSetterImpl模板特化
+ * @brief Specialization for types that have a SetterImpl member.
  */
 template <typename T>
 struct _HasSetterImpl<
@@ -128,7 +130,7 @@ struct _HasSetterImpl<
 };
 
 /**
- * @brief 判断类型是否为可读属性的辅助模板
+ * @brief Checks whether a type is a readable property.
  */
 template <typename T>
 struct _IsReadableProperty
@@ -136,7 +138,7 @@ struct _IsReadableProperty
 };
 
 /**
- * @brief 判断类型是否为可写属性的辅助模板
+ * @brief Checks whether a type is a writable property.
  */
 template <typename T>
 struct _IsWritableProperty
@@ -144,14 +146,14 @@ struct _IsWritableProperty
 };
 
 /**
- * @brief 判断类型是否可以使用[]操作符的辅助模板
+ * @brief Checks whether operator[] is available for the given types.
  */
 template <typename T, typename U, typename = void>
 struct _BracketOperationHelper : std::false_type {
 };
 
 /**
- * @brief _BracketOperationHelper模板特化
+ * @brief Specialization for types that support operator[].
  */
 template <typename T, typename U>
 struct _BracketOperationHelper<
@@ -160,14 +162,14 @@ struct _BracketOperationHelper<
 };
 
 /**
- * @brief 判断类型是否有operator->的辅助模板
+ * @brief Checks whether a type has operator->.
  */
 template <typename T, typename = void>
 struct _HasArrowOperator : std::false_type {
 };
 
 /**
- * @brief _HasArrowOperator模板特化
+ * @brief Specialization for types that have operator->.
  */
 template <typename T>
 struct _HasArrowOperator<
@@ -176,7 +178,7 @@ struct _HasArrowOperator<
 };
 
 /**
- * @brief 属性setter参数类型辅助模板
+ * @brief Helper to select the setter parameter type (pass scalars by value, others by const ref).
  */
 template <typename T>
 struct _PropertySetterParamTypeHelper {
@@ -185,7 +187,7 @@ struct _PropertySetterParamTypeHelper {
 };
 
 /**
- * @brief 属性setter参数类型
+ * @brief Deduced parameter type for property setters.
  */
 template <typename T>
 using _PropertySetterParamType =
@@ -194,17 +196,17 @@ using _PropertySetterParamType =
 /*================================================================================*/
 
 /**
- * @brief 字段访问器，用于实现使用operator->取属性字段
+ * @brief Provides operator-> access to the underlying value's fields.
  */
 template <typename T>
 struct FieldsAccessor {
     /**
-     * @brief 字段访问器所维护的值
+     * @brief The stored value.
      */
     T value;
 
     /**
-     * @brief 构造字段访问器
+     * @brief Constructs the accessor by forwarding arguments to the value.
      */
     template <typename... Args>
     FieldsAccessor(Args &&...args)
@@ -213,7 +215,7 @@ struct FieldsAccessor {
     }
 
     /**
-     * @brief 指针类型，直接返回值
+     * @brief Pointer type: returns the pointer directly.
      */
     template <typename U = T>
     auto operator->()
@@ -223,7 +225,7 @@ struct FieldsAccessor {
     }
 
     /**
-     * @brief 非指针类型，且无operator->，返回值的地址
+     * @brief Non-pointer type without operator->: returns the address of the value.
      */
     template <typename U = T>
     auto operator->()
@@ -233,7 +235,7 @@ struct FieldsAccessor {
     }
 
     /**
-     * @brief 非指针类型，且有operator->，转发operator->
+     * @brief Non-pointer type with operator->: forwards to the value's operator->.
      */
     template <typename U = T>
     auto operator->()
@@ -244,7 +246,7 @@ struct FieldsAccessor {
 };
 
 /**
- * @brief 成员属性初始化器
+ * @brief Initializer for member (non-static) properties.
  */
 template <typename TOwner, typename TValue>
 class MemberPropertyInitializer
@@ -255,23 +257,23 @@ class MemberPropertyInitializer
 
 private:
     /**
-     * @brief 属性所有者
+     * @brief Pointer to the owning object.
      */
     TOwner *_owner;
 
     /**
-     * @brief getter函数指针
+     * @brief Getter function pointer.
      */
     TValue (*_getter)(TOwner *);
 
     /**
-     * @brief setter函数指针
+     * @brief Setter function pointer.
      */
     void (*_setter)(TOwner *, _PropertySetterParamType<TValue>);
 
 public:
     /**
-     * @brief 构造成员属性初始化器
+     * @brief Constructs the initializer with the given owner.
      */
     MemberPropertyInitializer(TOwner *owner)
         : _owner(owner), _getter(nullptr), _setter(nullptr)
@@ -279,7 +281,7 @@ public:
     }
 
     /**
-     * @brief 设置getter
+     * @brief Sets the getter via a free function pointer.
      */
     MemberPropertyInitializer &Getter(TValue (*getter)(TOwner *))
     {
@@ -288,7 +290,7 @@ public:
     }
 
     /**
-     * @brief 设置setter
+     * @brief Sets the setter via a free function pointer.
      */
     MemberPropertyInitializer &Setter(void (*setter)(TOwner *, _PropertySetterParamType<TValue>))
     {
@@ -297,7 +299,7 @@ public:
     }
 
     /**
-     * @brief 设置成员函数getter
+     * @brief Sets the getter via a non-const member function pointer.
      */
     template <TValue (TOwner::*getter)()>
     MemberPropertyInitializer &Getter()
@@ -309,7 +311,7 @@ public:
     }
 
     /**
-     * @brief 设置成员函数getter
+     * @brief Sets the getter via a const member function pointer.
      */
     template <TValue (TOwner::*getter)() const>
     MemberPropertyInitializer &Getter()
@@ -321,7 +323,7 @@ public:
     }
 
     /**
-     * @brief 设置成员函数setter
+     * @brief Sets the setter via a non-const member function pointer.
      */
     template <void (TOwner::*setter)(_PropertySetterParamType<TValue>)>
     MemberPropertyInitializer &Setter()
@@ -333,7 +335,7 @@ public:
     }
 
     /**
-     * @brief 设置成员函数setter
+     * @brief Sets the setter via a const member function pointer.
      */
     template <void (TOwner::*setter)(_PropertySetterParamType<TValue>) const>
     MemberPropertyInitializer &Setter()
@@ -345,7 +347,7 @@ public:
     }
 
     /**
-     * @brief 设置简单字段getter
+     * @brief Sets the getter to a direct field access.
      */
     template <TValue TOwner::*field>
     MemberPropertyInitializer &Getter()
@@ -357,7 +359,7 @@ public:
     }
 
     /**
-     * @brief 设置简单字段setter
+     * @brief Sets the setter to a direct field assignment.
      */
     template <TValue TOwner::*field>
     MemberPropertyInitializer &Setter()
@@ -370,7 +372,7 @@ public:
 };
 
 /**
- * @brief 静态属性初始化器
+ * @brief Initializer for static (non-member) properties.
  */
 template <typename TValue>
 class StaticPropertyInitializer
@@ -381,18 +383,18 @@ class StaticPropertyInitializer
 
 private:
     /**
-     * @brief getter函数指针
+     * @brief Static getter function pointer.
      */
     TValue (*_getter)();
 
     /**
-     * @brief setter函数指针
+     * @brief Static setter function pointer.
      */
     void (*_setter)(_PropertySetterParamType<TValue>);
 
 public:
     /**
-     * @brief 构造静态属性初始化器
+     * @brief Default constructor.
      */
     StaticPropertyInitializer()
         : _getter(nullptr), _setter(nullptr)
@@ -400,7 +402,7 @@ public:
     }
 
     /**
-     * @brief 设置getter
+     * @brief Sets the static getter function.
      */
     StaticPropertyInitializer &Getter(TValue (*getter)())
     {
@@ -409,7 +411,7 @@ public:
     }
 
     /**
-     * @brief 设置setter
+     * @brief Sets the static setter function.
      */
     StaticPropertyInitializer &Setter(void (*setter)(_PropertySetterParamType<TValue>))
     {
@@ -421,30 +423,27 @@ public:
 /*================================================================================*/
 
 /**
- * @brief 属性基类模板
+ * @brief Base class template for properties.
  */
 template <typename T, typename TDerived>
 class PropertyBase
 {
 public:
-    // 属性值类型别名
-    using TValue = T;
-
-    // setter参数类型别名
+    using TValue       = T;
     using TSetterParam = _PropertySetterParamType<T>;
 
     // /**
-    //  * @brief 获取属性值，由子类实现
+    //  * @brief Gets the property value (implemented by derived class).
     //  */
     // T GetterImpl() const;
 
     // /**
-    //  * @brief 设置属性值，由子类实现
+    //  * @brief Sets the property value (implemented by derived class).
     //  */
     // void SetterImpl(TSetterParam value) const;
 
     /**
-     * @brief 访问属性字段，可由子类重写
+     * @brief Returns a FieldsAccessor for member access via operator->.
      */
     FieldsAccessor<T> AccessFields() const
     {
@@ -452,7 +451,7 @@ public:
     }
 
     /**
-     * @brief 获取属性值
+     * @brief Gets the property value.
      */
     T Get() const
     {
@@ -460,7 +459,7 @@ public:
     }
 
     /**
-     * @brief 设置属性值
+     * @brief Sets the property value.
      */
     void Set(TSetterParam value) const
     {
@@ -468,7 +467,7 @@ public:
     }
 
     /**
-     * @brief 取属性字段
+     * @brief Arrow operator for field access.
      */
     auto operator->() const
     {
@@ -476,7 +475,7 @@ public:
     }
 
     /**
-     * @brief 隐式转换
+     * @brief Implicit conversion to T.
      */
     operator T() const
     {
@@ -484,7 +483,7 @@ public:
     }
 
     /**
-     * @brief 隐式转换
+     * @brief Implicit conversion to U (for non-arithmetic, convertible types).
      */
     template <
         typename U = T,
@@ -495,7 +494,7 @@ public:
     }
 
     /**
-     * @brief 显式转换
+     * @brief Explicit conversion to U (for non-arithmetic, non-convertible but explicitly-convertible types).
      */
     template <
         typename U = T,
@@ -507,7 +506,7 @@ public:
     }
 
     /**
-     * @brief 设置属性值
+     * @brief Assigns a value to the property.
      */
     TDerived &operator=(TSetterParam value)
     {
@@ -516,7 +515,7 @@ public:
     }
 
     /**
-     * @brief 设置属性值
+     * @brief Assigns a value to the property (const overload).
      */
     const TDerived &operator=(TSetterParam value) const
     {
@@ -525,7 +524,7 @@ public:
     }
 
     /**
-     * @brief 设置属性值
+     * @brief Assigns from another property.
      */
     TDerived &operator=(const PropertyBase &prop)
     {
@@ -534,7 +533,7 @@ public:
     }
 
     /**
-     * @brief 设置属性值
+     * @brief Assigns from another property (const overload).
      */
     const TDerived &operator=(const PropertyBase &prop) const
     {
@@ -543,7 +542,7 @@ public:
     }
 
     /**
-     * @brief 加赋值运算
+     * @brief Compound add assignment.
      */
     template <typename U>
     auto operator+=(U &&value)
@@ -554,7 +553,7 @@ public:
     }
 
     /**
-     * @brief 加赋值运算
+     * @brief Compound add assignment (const overload).
      */
     template <typename U>
     auto operator+=(U &&value) const
@@ -565,7 +564,7 @@ public:
     }
 
     /**
-     * @brief 加赋值运算
+     * @brief Compound add assignment from another property.
      */
     template <typename D, typename U>
     auto operator+=(const PropertyBase<U, D> &prop)
@@ -576,7 +575,7 @@ public:
     }
 
     /**
-     * @brief 加赋值运算
+     * @brief Compound add assignment from another property (const overload).
      */
     template <typename D, typename U>
     auto operator+=(const PropertyBase<U, D> &prop) const
@@ -587,7 +586,7 @@ public:
     }
 
     /**
-     * @brief 减赋值运算
+     * @brief Compound subtract assignment.
      */
     template <typename U>
     auto operator-=(U &&value)
@@ -598,7 +597,7 @@ public:
     }
 
     /**
-     * @brief 减赋值运算
+     * @brief Compound subtract assignment (const overload).
      */
     template <typename U>
     auto operator-=(U &&value) const
@@ -609,7 +608,7 @@ public:
     }
 
     /**
-     * @brief 减赋值运算
+     * @brief Compound subtract assignment from another property.
      */
     template <typename D, typename U>
     auto operator-=(const PropertyBase<U, D> &prop)
@@ -620,7 +619,7 @@ public:
     }
 
     /**
-     * @brief 减赋值运算
+     * @brief Compound subtract assignment from another property (const overload).
      */
     template <typename D, typename U>
     auto operator-=(const PropertyBase<U, D> &prop) const
@@ -631,7 +630,7 @@ public:
     }
 
     /**
-     * @brief 乘赋值运算
+     * @brief Compound multiply assignment.
      */
     template <typename U>
     auto operator*=(U &&value)
@@ -642,7 +641,7 @@ public:
     }
 
     /**
-     * @brief 乘赋值运算
+     * @brief Compound multiply assignment (const overload).
      */
     template <typename U>
     auto operator*=(U &&value) const
@@ -653,7 +652,7 @@ public:
     }
 
     /**
-     * @brief 乘赋值运算
+     * @brief Compound multiply assignment from another property.
      */
     template <typename D, typename U>
     auto operator*=(const PropertyBase<U, D> &prop)
@@ -664,7 +663,7 @@ public:
     }
 
     /**
-     * @brief 乘赋值运算
+     * @brief Compound multiply assignment from another property (const overload).
      */
     template <typename D, typename U>
     auto operator*=(const PropertyBase<U, D> &prop) const
@@ -675,7 +674,7 @@ public:
     }
 
     /**
-     * @brief 除赋值运算
+     * @brief Compound divide assignment.
      */
     template <typename U>
     auto operator/=(U &&value)
@@ -686,7 +685,7 @@ public:
     }
 
     /**
-     * @brief 除赋值运算
+     * @brief Compound divide assignment (const overload).
      */
     template <typename U>
     auto operator/=(U &&value) const
@@ -697,7 +696,7 @@ public:
     }
 
     /**
-     * @brief 除赋值运算
+     * @brief Compound divide assignment from another property.
      */
     template <typename D, typename U>
     auto operator/=(const PropertyBase<U, D> &prop)
@@ -708,7 +707,7 @@ public:
     }
 
     /**
-     * @brief 除赋值运算
+     * @brief Compound divide assignment from another property (const overload).
      */
     template <typename D, typename U>
     auto operator/=(const PropertyBase<U, D> &prop) const
@@ -719,7 +718,7 @@ public:
     }
 
     /**
-     * @brief 前置自增运算
+     * @brief Pre-increment.
      */
     template <typename U = T>
     auto operator++()
@@ -730,7 +729,7 @@ public:
     }
 
     /**
-     * @brief 前置自增运算
+     * @brief Pre-increment (const overload).
      */
     template <typename U = T>
     auto operator++() const
@@ -741,7 +740,7 @@ public:
     }
 
     /**
-     * @brief 前置自减运算
+     * @brief Pre-decrement.
      */
     template <typename U = T>
     auto operator--()
@@ -752,7 +751,7 @@ public:
     }
 
     /**
-     * @brief 前置自减运算
+     * @brief Pre-decrement (const overload).
      */
     template <typename U = T>
     auto operator--() const
@@ -763,7 +762,7 @@ public:
     }
 
     /**
-     * @brief 后置自增运算
+     * @brief Post-increment.
      */
     template <typename U = T>
     auto operator++(int) const
@@ -775,7 +774,7 @@ public:
     }
 
     /**
-     * @brief 后置自减运算
+     * @brief Post-decrement.
      */
     template <typename U = T>
     auto operator--(int) const
@@ -787,7 +786,7 @@ public:
     }
 
     /**
-     * @brief 按位与赋值运算
+     * @brief Compound bitwise AND assignment.
      */
     template <typename U>
     auto operator&=(U &&value)
@@ -798,7 +797,7 @@ public:
     }
 
     /**
-     * @brief 按位与赋值运算
+     * @brief Compound bitwise AND assignment (const overload).
      */
     template <typename U>
     auto operator&=(U &&value) const
@@ -809,7 +808,7 @@ public:
     }
 
     /**
-     * @brief 按位与赋值运算
+     * @brief Compound bitwise AND assignment from another property.
      */
     template <typename D, typename U>
     auto operator&=(const PropertyBase<U, D> &prop)
@@ -820,7 +819,7 @@ public:
     }
 
     /**
-     * @brief 按位与赋值运算
+     * @brief Compound bitwise AND assignment from another property (const overload).
      */
     template <typename D, typename U>
     auto operator&=(const PropertyBase<U, D> &prop) const
@@ -831,7 +830,7 @@ public:
     }
 
     /**
-     * @brief 按位或赋值运算
+     * @brief Compound bitwise OR assignment.
      */
     template <typename U>
     auto operator|=(U &&value)
@@ -842,7 +841,7 @@ public:
     }
 
     /**
-     * @brief 按位或赋值运算
+     * @brief Compound bitwise OR assignment (const overload).
      */
     template <typename U>
     auto operator|=(U &&value) const
@@ -853,7 +852,7 @@ public:
     }
 
     /**
-     * @brief 按位或赋值运算
+     * @brief Compound bitwise OR assignment from another property.
      */
     template <typename D, typename U>
     auto operator|=(const PropertyBase<U, D> &prop)
@@ -864,7 +863,7 @@ public:
     }
 
     /**
-     * @brief 按位或赋值运算
+     * @brief Compound bitwise OR assignment from another property (const overload).
      */
     template <typename D, typename U>
     auto operator|=(const PropertyBase<U, D> &prop) const
@@ -875,7 +874,7 @@ public:
     }
 
     /**
-     * @brief 按位异或赋值运算
+     * @brief Compound bitwise XOR assignment.
      */
     template <typename U>
     auto operator^=(U &&value)
@@ -886,7 +885,7 @@ public:
     }
 
     /**
-     * @brief 按位异或赋值运算
+     * @brief Compound bitwise XOR assignment (const overload).
      */
     template <typename U>
     auto operator^=(U &&value) const
@@ -897,7 +896,7 @@ public:
     }
 
     /**
-     * @brief 按位异或赋值运算
+     * @brief Compound bitwise XOR assignment from another property.
      */
     template <typename D, typename U>
     auto operator^=(const PropertyBase<U, D> &prop)
@@ -908,7 +907,7 @@ public:
     }
 
     /**
-     * @brief 按位异或赋值运算
+     * @brief Compound bitwise XOR assignment from another property (const overload).
      */
     template <typename D, typename U>
     auto operator^=(const PropertyBase<U, D> &prop) const
@@ -919,7 +918,7 @@ public:
     }
 
     /**
-     * @brief 左移赋值运算
+     * @brief Compound left-shift assignment.
      */
     template <typename U>
     auto operator<<=(U &&value)
@@ -930,7 +929,7 @@ public:
     }
 
     /**
-     * @brief 左移赋值运算
+     * @brief Compound left-shift assignment (const overload).
      */
     template <typename U>
     auto operator<<=(U &&value) const
@@ -941,7 +940,7 @@ public:
     }
 
     /**
-     * @brief 左移赋值运算
+     * @brief Compound left-shift assignment from another property.
      */
     template <typename D, typename U>
     auto operator<<=(const PropertyBase<U, D> &prop)
@@ -952,7 +951,7 @@ public:
     }
 
     /**
-     * @brief 左移赋值运算
+     * @brief Compound left-shift assignment from another property (const overload).
      */
     template <typename D, typename U>
     auto operator<<=(const PropertyBase<U, D> &prop) const
@@ -963,7 +962,7 @@ public:
     }
 
     /**
-     * @brief 右移赋值运算
+     * @brief Compound right-shift assignment.
      */
     template <typename U>
     auto operator>>=(U &&value)
@@ -974,7 +973,7 @@ public:
     }
 
     /**
-     * @brief 右移赋值运算
+     * @brief Compound right-shift assignment (const overload).
      */
     template <typename U>
     auto operator>>=(U &&value) const
@@ -985,7 +984,7 @@ public:
     }
 
     /**
-     * @brief 右移赋值运算
+     * @brief Compound right-shift assignment from another property.
      */
     template <typename D, typename U>
     auto operator>>=(const PropertyBase<U, D> &prop)
@@ -996,7 +995,7 @@ public:
     }
 
     /**
-     * @brief 右移赋值运算
+     * @brief Compound right-shift assignment from another property (const overload).
      */
     template <typename D, typename U>
     auto operator>>=(const PropertyBase<U, D> &prop) const
@@ -1007,7 +1006,7 @@ public:
     }
 
     /**
-     * @brief 逻辑非运算
+     * @brief Logical NOT.
      */
     template <typename U = T>
     auto operator!() const
@@ -1017,7 +1016,7 @@ public:
     }
 
     /**
-     * @brief 按位非运算
+     * @brief Bitwise NOT.
      */
     template <typename U = T>
     auto operator~() const
@@ -1027,10 +1026,9 @@ public:
     }
 
     /**
-     * @brief 解引用运算
-     * @note 仅在T的operator*返回非引用类型时启用：Get()可能返回临时对象，
-     *       若T的operator*返回引用，将产生悬空引用，因此不允许通过属性的
-     *       operator*直接访问返回引用的重载，应先将Get()的结果保存到变量后再使用。
+     * @brief Dereference operator.
+     * @note Enabled only when T::operator* returns a non-reference type, because
+     *       Get() may return a temporary — returning a reference would dangle.
      */
     template <typename U = T>
     auto operator*() const
@@ -1043,9 +1041,9 @@ public:
     }
 
     /**
-     * @brief 指针解引用运算
-     * @note T为指针时，Get()返回的指针虽是临时对象，但其指向的内存独立存在，
-     *       故此处即使operator*返回引用也不会产生悬空引用，无需限制返回类型。
+     * @brief Pointer dereference operator.
+     * @note When T is a pointer, the pointer returned by Get() is a temporary,
+     *       but the memory it points to is independent, so returning a reference is safe.
      */
     template <typename U = T>
     auto operator*() const
@@ -1057,7 +1055,7 @@ public:
     }
 
     /**
-     * @brief 正号运算
+     * @brief Unary plus.
      */
     template <typename U = T>
     auto operator+() const
@@ -1067,7 +1065,7 @@ public:
     }
 
     /**
-     * @brief 负号运算
+     * @brief Unary minus.
      */
     template <typename U = T>
     auto operator-() const
@@ -1077,7 +1075,7 @@ public:
     }
 
     /**
-     * @brief 加法运算
+     * @brief Addition.
      */
     template <typename U>
     auto operator+(U &&value) const
@@ -1087,7 +1085,7 @@ public:
     }
 
     /**
-     * @brief 加法运算
+     * @brief Addition with another property.
      */
     template <typename D, typename U>
     auto operator+(const PropertyBase<U, D> &prop) const
@@ -1097,7 +1095,7 @@ public:
     }
 
     /**
-     * @brief 减法运算
+     * @brief Subtraction.
      */
     template <typename U>
     auto operator-(U &&value) const
@@ -1107,7 +1105,7 @@ public:
     }
 
     /**
-     * @brief 减法运算
+     * @brief Subtraction with another property.
      */
     template <typename D, typename U>
     auto operator-(const PropertyBase<U, D> &prop) const
@@ -1117,7 +1115,7 @@ public:
     }
 
     /**
-     * @brief 乘法运算
+     * @brief Multiplication.
      */
     template <typename U>
     auto operator*(U &&value) const
@@ -1127,7 +1125,7 @@ public:
     }
 
     /**
-     * @brief 乘法运算
+     * @brief Multiplication with another property.
      */
     template <typename D, typename U>
     auto operator*(const PropertyBase<U, D> &prop) const
@@ -1137,7 +1135,7 @@ public:
     }
 
     /**
-     * @brief 除法运算
+     * @brief Division.
      */
     template <typename U>
     auto operator/(U &&value) const
@@ -1147,7 +1145,7 @@ public:
     }
 
     /**
-     * @brief 除法运算
+     * @brief Division with another property.
      */
     template <typename D, typename U>
     auto operator/(const PropertyBase<U, D> &prop) const
@@ -1157,7 +1155,7 @@ public:
     }
 
     /**
-     * @brief 取模运算
+     * @brief Modulo.
      */
     template <typename U>
     auto operator%(U &&value) const
@@ -1167,7 +1165,7 @@ public:
     }
 
     /**
-     * @brief 取模运算
+     * @brief Modulo with another property.
      */
     template <typename D, typename U>
     auto operator%(const PropertyBase<U, D> &prop) const
@@ -1177,7 +1175,7 @@ public:
     }
 
     /**
-     * @brief 等于运算
+     * @brief Equality comparison.
      */
     template <typename U>
     auto operator==(U &&value) const
@@ -1187,7 +1185,7 @@ public:
     }
 
     /**
-     * @brief 等于运算
+     * @brief Equality comparison with another property.
      */
     template <typename D, typename U>
     auto operator==(const PropertyBase<U, D> &prop) const
@@ -1197,8 +1195,8 @@ public:
     }
 
     /**
-     * @brief 不等于运算
-     * @note 避免与c++20自动生成的!=冲突，通过==取反实现
+     * @brief Inequality comparison.
+     * @note Implemented as !(==) to avoid conflicts with C++20 synthesized !=.
      */
     template <typename U>
     auto operator!=(U &&value) const
@@ -1208,8 +1206,8 @@ public:
     }
 
     /**
-     * @brief 不等于运算
-     * @note 避免与c++20自动生成的!=冲突，通过==取反实现
+     * @brief Inequality comparison with another property.
+     * @note Implemented as !(==) to avoid conflicts with C++20 synthesized !=.
      */
     template <typename D, typename U>
     auto operator!=(const PropertyBase<U, D> &prop) const
@@ -1219,7 +1217,7 @@ public:
     }
 
     /**
-     * @brief 小于运算
+     * @brief Less-than comparison.
      */
     template <typename U>
     auto operator<(U &&value) const
@@ -1229,7 +1227,7 @@ public:
     }
 
     /**
-     * @brief 小于运算
+     * @brief Less-than comparison with another property.
      */
     template <typename D, typename U>
     auto operator<(const PropertyBase<U, D> &prop) const
@@ -1239,7 +1237,7 @@ public:
     }
 
     /**
-     * @brief 小于等于运算
+     * @brief Less-than-or-equal comparison.
      */
     template <typename U>
     auto operator<=(U &&value) const
@@ -1249,7 +1247,7 @@ public:
     }
 
     /**
-     * @brief 小于等于运算
+     * @brief Less-than-or-equal comparison with another property.
      */
     template <typename D, typename U>
     auto operator<=(const PropertyBase<U, D> &prop) const
@@ -1259,7 +1257,7 @@ public:
     }
 
     /**
-     * @brief 大于运算
+     * @brief Greater-than comparison.
      */
     template <typename U>
     auto operator>(U &&value) const
@@ -1269,7 +1267,7 @@ public:
     }
 
     /**
-     * @brief 大于运算
+     * @brief Greater-than comparison with another property.
      */
     template <typename D, typename U>
     auto operator>(const PropertyBase<U, D> &prop) const
@@ -1279,7 +1277,7 @@ public:
     }
 
     /**
-     * @brief 大于等于运算
+     * @brief Greater-than-or-equal comparison.
      */
     template <typename U>
     auto operator>=(U &&value) const
@@ -1289,7 +1287,7 @@ public:
     }
 
     /**
-     * @brief 大于等于运算
+     * @brief Greater-than-or-equal comparison with another property.
      */
     template <typename D, typename U>
     auto operator>=(const PropertyBase<U, D> &prop) const
@@ -1299,7 +1297,7 @@ public:
     }
 
     /**
-     * @brief 按位与运算
+     * @brief Bitwise AND.
      */
     template <typename U>
     auto operator&(U &&value) const
@@ -1309,7 +1307,7 @@ public:
     }
 
     /**
-     * @brief 按位与运算
+     * @brief Bitwise AND with another property.
      */
     template <typename D, typename U>
     auto operator&(const PropertyBase<U, D> &prop) const
@@ -1319,7 +1317,7 @@ public:
     }
 
     /**
-     * @brief 按位或运算
+     * @brief Bitwise OR.
      */
     template <typename U>
     auto operator|(U &&value) const
@@ -1329,7 +1327,7 @@ public:
     }
 
     /**
-     * @brief 按位或运算
+     * @brief Bitwise OR with another property.
      */
     template <typename D, typename U>
     auto operator|(const PropertyBase<U, D> &prop) const
@@ -1339,7 +1337,7 @@ public:
     }
 
     /**
-     * @brief 按位异或运算
+     * @brief Bitwise XOR.
      */
     template <typename U>
     auto operator^(U &&value) const
@@ -1349,7 +1347,7 @@ public:
     }
 
     /**
-     * @brief 按位异或运算
+     * @brief Bitwise XOR with another property.
      */
     template <typename D, typename U>
     auto operator^(const PropertyBase<U, D> &prop) const
@@ -1359,7 +1357,7 @@ public:
     }
 
     /**
-     * @brief 左移运算
+     * @brief Left shift.
      */
     template <typename U>
     auto operator<<(U &&value) const
@@ -1369,7 +1367,7 @@ public:
     }
 
     /**
-     * @brief 左移运算
+     * @brief Left shift with another property.
      */
     template <typename D, typename U>
     auto operator<<(const PropertyBase<U, D> &prop) const
@@ -1379,7 +1377,7 @@ public:
     }
 
     /**
-     * @brief 右移运算
+     * @brief Right shift.
      */
     template <typename U>
     auto operator>>(U &&value) const
@@ -1389,7 +1387,7 @@ public:
     }
 
     /**
-     * @brief 右移运算
+     * @brief Right shift with another property.
      */
     template <typename D, typename U>
     auto operator>>(const PropertyBase<U, D> &prop) const
@@ -1399,7 +1397,7 @@ public:
     }
 
     /**
-     * @brief 逻辑与运算
+     * @brief Logical AND.
      */
     template <typename U>
     auto operator&&(U &&value) const
@@ -1409,7 +1407,7 @@ public:
     }
 
     /**
-     * @brief 逻辑与运算
+     * @brief Logical AND with another property.
      */
     template <typename D, typename U>
     auto operator&&(const PropertyBase<U, D> &prop) const
@@ -1419,7 +1417,7 @@ public:
     }
 
     /**
-     * @brief 逻辑或运算
+     * @brief Logical OR.
      */
     template <typename U>
     auto operator||(U &&value) const
@@ -1429,7 +1427,7 @@ public:
     }
 
     /**
-     * @brief 逻辑或运算
+     * @brief Logical OR with another property.
      */
     template <typename D, typename U>
     auto operator||(const PropertyBase<U, D> &prop) const
@@ -1439,10 +1437,9 @@ public:
     }
 
     /**
-     * @brief 下标运算
-     * @note 仅在T的operator[]返回非引用类型时启用：Get()可能返回临时对象，
-     *       若T的operator[]返回引用，将产生悬空引用，因此不允许通过属性的
-     *       operator[]直接访问返回引用的重载，应先将Get()的结果保存到变量后再使用。
+     * @brief Subscript operator.
+     * @note Enabled only when T::operator[] returns a non-reference type, because
+     *       Get() may return a temporary — returning a reference would dangle.
      */
     template <typename U>
     auto operator[](U &&value) const
@@ -1455,10 +1452,8 @@ public:
     }
 
     /**
-     * @brief 下标运算
-     * @note 仅在T的operator[]返回非引用类型时启用：Get()可能返回临时对象，
-     *       若T的operator[]返回引用，将产生悬空引用，因此不允许通过属性的
-     *       operator[]直接访问返回引用的重载，应先将Get()的结果保存到变量后再使用。
+     * @brief Subscript operator with another property as index.
+     * @note Enabled only when T::operator[] returns a non-reference type.
      */
     template <typename D, typename U>
     auto operator[](const PropertyBase<U, D> &prop) const
@@ -1471,9 +1466,9 @@ public:
     }
 
     /**
-     * @brief 指针下标运算
-     * @note T为指针时，Get()返回的指针虽是临时对象，但其指向的内存独立存在，
-     *       故此处即使operator[]返回引用也不会产生悬空引用，无需限制返回类型。
+     * @brief Pointer subscript operator.
+     * @note When T is a pointer, the pointer returned by Get() is a temporary,
+     *       but the memory it points to is independent, so returning a reference is safe.
      */
     template <typename U>
     auto operator[](U &&value) const
@@ -1485,9 +1480,8 @@ public:
     }
 
     /**
-     * @brief 指针下标运算
-     * @note T为指针时，Get()返回的指针虽是临时对象，但其指向的内存独立存在，
-     *       故此处即使operator[]返回引用也不会产生悬空引用，无需限制返回类型。
+     * @brief Pointer subscript operator with another property as index.
+     * @note When T is a pointer, returning a reference is safe.
      */
     template <typename D, typename U>
     auto operator[](const PropertyBase<U, D> &prop) const
@@ -1500,25 +1494,26 @@ public:
 
 protected:
     /**
-     * @brief 用于存储任意签名函数指针的通用类型
-     * @note 函数指针类型间通过reinterpret_cast互转再转回原类型不丢失信息（C++标准良定义），
-     *       使用统一的函数指针类型作为存储可避免函数指针与void*之间的conditionally-supported转换。
+     * @brief Generic function pointer type used for storage.
+     * @note Converting between function pointer types via reinterpret_cast and back
+     *       is well-defined in C++.  Using a uniform type avoids the
+     *       conditionally-supported conversion between function pointers and void*.
      */
     using TFuncPtr = void (*)();
 
     /**
-     * @brief 静态属性偏移量标记
+     * @brief Sentinel offset value indicating a static property.
      */
     static constexpr std::ptrdiff_t _STATICOFFSET =
         (std::numeric_limits<std::ptrdiff_t>::max)();
 
     /**
-     * @brief 所有者对象相对于当前属性对象的偏移量
+     * @brief Byte offset from this property to its owning object.
      */
     std::ptrdiff_t _offset{_STATICOFFSET};
 
     /**
-     * @brief 判断属性是否为静态属性
+     * @brief Returns true if this is a static property.
      */
     bool IsStatic() const noexcept
     {
@@ -1526,7 +1521,7 @@ protected:
     }
 
     /**
-     * @brief 设置属性所有者对象，nullptr表示静态属性
+     * @brief Sets the owning object; nullptr makes this a static property.
      */
     void SetOwner(void *owner) noexcept
     {
@@ -1538,7 +1533,7 @@ protected:
     }
 
     /**
-     * @brief 获取属性所有者对象，当属性为静态属性时返回nullptr
+     * @brief Returns the owning object, or nullptr if this is a static property.
      */
     void *GetOwner() const noexcept
     {
@@ -1551,7 +1546,7 @@ protected:
 
 public:
     /**
-     * @brief 获取成员属性初始化器
+     * @brief Creates a MemberPropertyInitializer for binding a member property.
      */
     template <typename TOwner>
     static auto Init(TOwner *owner)
@@ -1561,7 +1556,7 @@ public:
     }
 
     /**
-     * @brief 获取静态属性初始化器
+     * @brief Creates a StaticPropertyInitializer for binding a static property.
      */
     static auto Init()
         -> StaticPropertyInitializer<T>
@@ -1573,7 +1568,7 @@ public:
 /*================================================================================*/
 
 /**
- * @brief 加法运算
+ * @brief Addition (non-property left operand).
  */
 template <typename D, typename T, typename U>
 auto operator+(T &&left, const PropertyBase<U, D> &right)
@@ -1583,7 +1578,7 @@ auto operator+(T &&left, const PropertyBase<U, D> &right)
 }
 
 /**
- * @brief 减法运算
+ * @brief Subtraction (non-property left operand).
  */
 template <typename D, typename T, typename U>
 auto operator-(T &&left, const PropertyBase<U, D> &right)
@@ -1593,7 +1588,7 @@ auto operator-(T &&left, const PropertyBase<U, D> &right)
 }
 
 /**
- * @brief 乘法运算
+ * @brief Multiplication (non-property left operand).
  */
 template <typename D, typename T, typename U>
 auto operator*(T &&left, const PropertyBase<U, D> &right)
@@ -1603,7 +1598,7 @@ auto operator*(T &&left, const PropertyBase<U, D> &right)
 }
 
 /**
- * @brief 除法运算
+ * @brief Division (non-property left operand).
  */
 template <typename D, typename T, typename U>
 auto operator/(T &&left, const PropertyBase<U, D> &right)
@@ -1613,7 +1608,7 @@ auto operator/(T &&left, const PropertyBase<U, D> &right)
 }
 
 /**
- * @brief 取模运算
+ * @brief Modulo (non-property left operand).
  */
 template <typename D, typename T, typename U>
 auto operator%(T &&left, const PropertyBase<U, D> &right)
@@ -1623,7 +1618,7 @@ auto operator%(T &&left, const PropertyBase<U, D> &right)
 }
 
 /**
- * @brief 等于运算
+ * @brief Equality comparison (non-property left operand).
  */
 template <typename D, typename T, typename U>
 auto operator==(T &&left, const PropertyBase<U, D> &right)
@@ -1633,8 +1628,8 @@ auto operator==(T &&left, const PropertyBase<U, D> &right)
 }
 
 /**
- * @brief 不等于运算
- * @note 避免与c++20自动生成的!=冲突，通过==取反实现
+ * @brief Inequality comparison (non-property left operand).
+ * @note Implemented as !(==) to avoid conflicts with C++20 synthesized !=.
  */
 template <typename D, typename T, typename U>
 auto operator!=(T &&left, const PropertyBase<U, D> &right)
@@ -1644,7 +1639,7 @@ auto operator!=(T &&left, const PropertyBase<U, D> &right)
 }
 
 /**
- * @brief 小于运算
+ * @brief Less-than comparison (non-property left operand).
  */
 template <typename D, typename T, typename U>
 auto operator<(T &&left, const PropertyBase<U, D> &right)
@@ -1654,7 +1649,7 @@ auto operator<(T &&left, const PropertyBase<U, D> &right)
 }
 
 /**
- * @brief 小于等于运算
+ * @brief Less-than-or-equal comparison (non-property left operand).
  */
 template <typename D, typename T, typename U>
 auto operator<=(T &&left, const PropertyBase<U, D> &right)
@@ -1664,7 +1659,7 @@ auto operator<=(T &&left, const PropertyBase<U, D> &right)
 }
 
 /**
- * @brief 大于运算
+ * @brief Greater-than comparison (non-property left operand).
  */
 template <typename D, typename T, typename U>
 auto operator>(T &&left, const PropertyBase<U, D> &right)
@@ -1674,7 +1669,7 @@ auto operator>(T &&left, const PropertyBase<U, D> &right)
 }
 
 /**
- * @brief 大于等于运算
+ * @brief Greater-than-or-equal comparison (non-property left operand).
  */
 template <typename D, typename T, typename U>
 auto operator>=(T &&left, const PropertyBase<U, D> &right)
@@ -1684,7 +1679,7 @@ auto operator>=(T &&left, const PropertyBase<U, D> &right)
 }
 
 /**
- * @brief 按位与运算
+ * @brief Bitwise AND (non-property left operand).
  */
 template <typename D, typename T, typename U>
 auto operator&(T &&left, const PropertyBase<U, D> &right)
@@ -1694,7 +1689,7 @@ auto operator&(T &&left, const PropertyBase<U, D> &right)
 }
 
 /**
- * @brief 按位或运算
+ * @brief Bitwise OR (non-property left operand).
  */
 template <typename D, typename T, typename U>
 auto operator|(T &&left, const PropertyBase<U, D> &right)
@@ -1704,7 +1699,7 @@ auto operator|(T &&left, const PropertyBase<U, D> &right)
 }
 
 /**
- * @brief 按位异或运算
+ * @brief Bitwise XOR (non-property left operand).
  */
 template <typename D, typename T, typename U>
 auto operator^(T &&left, const PropertyBase<U, D> &right)
@@ -1714,7 +1709,7 @@ auto operator^(T &&left, const PropertyBase<U, D> &right)
 }
 
 /**
- * @brief 左移运算
+ * @brief Left shift (non-property left operand).
  */
 template <typename D, typename T, typename U>
 auto operator<<(T &&left, const PropertyBase<U, D> &right)
@@ -1724,7 +1719,7 @@ auto operator<<(T &&left, const PropertyBase<U, D> &right)
 }
 
 /**
- * @brief 右移运算
+ * @brief Right shift (non-property left operand).
  */
 template <typename D, typename T, typename U>
 auto operator>>(T &&left, const PropertyBase<U, D> &right)
@@ -1734,7 +1729,7 @@ auto operator>>(T &&left, const PropertyBase<U, D> &right)
 }
 
 /**
- * @brief 逻辑与运算
+ * @brief Logical AND (non-property left operand).
  */
 template <typename D, typename T, typename U>
 auto operator&&(T &&left, const PropertyBase<U, D> &right)
@@ -1744,7 +1739,7 @@ auto operator&&(T &&left, const PropertyBase<U, D> &right)
 }
 
 /**
- * @brief 逻辑或运算
+ * @brief Logical OR (non-property left operand).
  */
 template <typename D, typename T, typename U>
 auto operator||(T &&left, const PropertyBase<U, D> &right)
@@ -1756,7 +1751,7 @@ auto operator||(T &&left, const PropertyBase<U, D> &right)
 /*================================================================================*/
 
 /**
- * @brief 属性
+ * @brief Read-write property.
  */
 template <typename T>
 class Property : public PropertyBase<T, Property<T>>
@@ -1773,23 +1768,23 @@ public:
 
 private:
     /**
-     * @brief getter函数指针
+     * @brief Getter function pointer.
      */
     TFuncPtr _getter;
 
     /**
-     * @brief setter函数指针
+     * @brief Setter function pointer.
      */
     TFuncPtr _setter;
 
 public:
     /**
-     * @brief 继承父类operator=
+     * @brief Inherit assignment operators from the base class.
      */
     using TBase::operator=;
 
     /**
-     * @brief 构造成员属性
+     * @brief Constructs a member property from an initializer.
      */
     template <typename TOwner>
     explicit Property(const MemberPropertyInitializer<TOwner, T> &initializer)
@@ -1804,7 +1799,7 @@ public:
     }
 
     /**
-     * @brief 构造静态属性
+     * @brief Constructs a static property from an initializer.
      */
     explicit Property(const StaticPropertyInitializer<T> &initializer)
     {
@@ -1817,7 +1812,7 @@ public:
     }
 
     /**
-     * @brief 获取属性值
+     * @brief Gets the property value.
      */
     T GetterImpl() const
     {
@@ -1829,7 +1824,7 @@ public:
     }
 
     /**
-     * @brief 设置属性值
+     * @brief Sets the property value.
      */
     void SetterImpl(TSetterParam value) const
     {
@@ -1842,7 +1837,7 @@ public:
 };
 
 /**
- * @brief 只读属性
+ * @brief Read-only property (no setter).
  */
 template <typename T>
 class ReadOnlyProperty : public PropertyBase<T, ReadOnlyProperty<T>>
@@ -1857,13 +1852,13 @@ public:
 
 private:
     /**
-     * @brief getter函数指针
+     * @brief Getter function pointer.
      */
     TFuncPtr _getter;
 
 public:
     /**
-     * @brief 构造成员属性
+     * @brief Constructs a member property from an initializer.
      */
     template <typename TOwner>
     explicit ReadOnlyProperty(const MemberPropertyInitializer<TOwner, T> &initializer)
@@ -1876,7 +1871,7 @@ public:
     }
 
     /**
-     * @brief 构造静态属性
+     * @brief Constructs a static property from an initializer.
      */
     explicit ReadOnlyProperty(const StaticPropertyInitializer<T> &initializer)
     {
@@ -1887,7 +1882,7 @@ public:
     }
 
     /**
-     * @brief 获取属性值
+     * @brief Gets the property value.
      */
     T GetterImpl() const
     {
@@ -1900,7 +1895,7 @@ public:
 };
 
 /**
- * @brief 只写属性
+ * @brief Write-only property (no getter).
  */
 template <typename T>
 class WriteOnlyProperty : public PropertyBase<T, WriteOnlyProperty<T>>
@@ -1915,18 +1910,18 @@ public:
 
 private:
     /**
-     * @brief setter函数指针
+     * @brief Setter function pointer.
      */
     TFuncPtr _setter;
 
 public:
     /**
-     * @brief 继承父类operator=
+     * @brief Inherit assignment operators from the base class.
      */
     using TBase::operator=;
 
     /**
-     * @brief 构造成员属性
+     * @brief Constructs a member property from an initializer.
      */
     template <typename TOwner>
     explicit WriteOnlyProperty(const MemberPropertyInitializer<TOwner, T> &initializer)
@@ -1939,7 +1934,7 @@ public:
     }
 
     /**
-     * @brief 构造静态属性
+     * @brief Constructs a static property from an initializer.
      */
     explicit WriteOnlyProperty(const StaticPropertyInitializer<T> &initializer)
     {
@@ -1950,7 +1945,7 @@ public:
     }
 
     /**
-     * @brief 设置属性值
+     * @brief Sets the property value.
      */
     void SetterImpl(TSetterParam value) const
     {
