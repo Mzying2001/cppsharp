@@ -1,3 +1,12 @@
+/**
+ * @file property.h
+ * @brief Property implementation with getter/setter semantics, similar to C# properties.
+ *
+ * Provides Property, ReadOnlyProperty, and WriteOnlyProperty classes that
+ * support member and static property binding, operator overloading, and
+ * type-safe getter/setter access.
+ */
+
 #pragma once
 
 #ifndef PROPERTY_H_INCLUDED
@@ -12,6 +21,11 @@
 
 /*================================================================================*/
 
+/**
+ * @brief Generates a SFINAE trait that checks whether T @p OP U is valid (binary).
+ * @param NAME The trait struct name to generate.
+ * @param OP   The binary operator token (e.g. +, -, ==).
+ */
 #define _SW_DEFINE_OPERATION_HELPER(NAME, OP)                                                    \
     template <typename T, typename U, typename = void>                                           \
     struct NAME : std::false_type {                                                              \
@@ -21,6 +35,11 @@
         using type = decltype(std::declval<T>() OP std::declval<U>());                           \
     }
 
+/**
+ * @brief Generates a SFINAE trait that checks whether @p OP T is valid (unary).
+ * @param NAME The trait struct name to generate.
+ * @param OP   The unary operator token (e.g. !, ~, *, +, -).
+ */
 #define _SW_DEFINE_UNARY_OPERATION_HELPER(NAME, OP)                         \
     template <typename T, typename = void>                                  \
     struct NAME : std::false_type {                                         \

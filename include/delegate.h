@@ -1,3 +1,12 @@
+/**
+ * @file delegate.h
+ * @brief Multicast delegate implementation similar to C# Delegate.
+ *
+ * Provides ICallable, Delegate, Action, Predicate, and Func types that
+ * support storing, combining, and invoking multiple callable objects
+ * (free functions, member functions, lambdas, functors).
+ */
+
 #pragma once
 
 #ifndef DELEGATE_H_INCLUDED
