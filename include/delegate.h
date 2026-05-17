@@ -1159,4 +1159,6 @@ struct _FuncTypeHelper<std::tuple<Args...>> {
 template <typename... Types>
 using Func = typename _FuncTypeHelper<typename _FuncTraits<Types...>::TArgsTuple>::template TFunc<typename _FuncTraits<Types...>::TRet>;
 
+/*================================================================================*/
+
 #endif // DELEGATE_H_INCLUDED
