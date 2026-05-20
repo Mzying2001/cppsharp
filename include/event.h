@@ -20,7 +20,7 @@
 /*================================================================================*/
 
 /**
- * @brief Forward declarations.
+ * Forward declarations.
  */
 
 template <typename>
@@ -337,4 +337,4 @@ using EventHandler = Delegate<void(TSender &, TEventArgs &)>;
 
 /*================================================================================*/
 
-#endif // EVENT_H_INCLUDED
+#endif // !EVENT_H_INCLUDED

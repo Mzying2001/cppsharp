@@ -1161,4 +1161,4 @@ using Func = typename _FuncTypeHelper<typename _FuncTraits<Types...>::TArgsTuple
 
 /*================================================================================*/
 
-#endif // DELEGATE_H_INCLUDED
+#endif // !DELEGATE_H_INCLUDED
