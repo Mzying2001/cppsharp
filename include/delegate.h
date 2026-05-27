@@ -229,6 +229,8 @@ public:
      * @brief Adds a callable to the list.
      * @note Ownership of the raw pointer is transferred to the CallableList.
      * @note Exception safety:
+     *       - The incoming raw pointer is first guarded by a unique_ptr, so
+     *         failures before ownership transfer do not leak it.
      *       - SINGLE->LIST upgrade uses reserve(2) to avoid reallocation during
      *         emplace_back; the only failure path is shared_ptr control-block
      *         allocation, where the shared_ptr constructor guarantees the raw
@@ -239,27 +241,29 @@ public:
      */
     void Add(TCallable *callable)
     {
-        if (callable == nullptr) {
+        TSinglePtr owned(callable);
+
+        if (owned == nullptr) {
             return;
         }
 
         switch (_state) {
             case STATE_NONE: {
                 _Reset(STATE_SINGLE);
-                _GetSingle().reset(callable);
+                _GetSingle() = std::move(owned);
                 break;
             }
             case STATE_SINGLE: {
                 TSharedList list;
                 list.reserve(2);
                 list.emplace_back(_GetSingle().release());
-                list.emplace_back(callable);
+                list.emplace_back(owned.release());
                 _Reset(STATE_LIST);
                 _GetList() = std::move(list);
                 break;
             }
             case STATE_LIST: {
-                std::shared_ptr<TCallable> sp(callable);
+                std::shared_ptr<TCallable> sp(owned.release());
                 _GetList().emplace_back(std::move(sp));
                 break;
             }
@@ -598,6 +602,9 @@ private:
     };
 
 private:
+    /**
+     * @brief Stores the callable objects bound to this delegate.
+     */
     CallableList<TRet(Args...)> _data;
 
 public:
@@ -677,10 +684,13 @@ public:
         if (this == &other) {
             return *this;
         }
-        _data.Clear();
+
+        CallableList<TRet(Args...)> copied;
+
         for (size_t i = 0; i < other._data.Count(); ++i) {
-            _data.Add(other._data[i]->Clone());
+            copied.Add(other._data[i]->Clone());
         }
+        _data = std::move(copied);
         return *this;
     }
 
