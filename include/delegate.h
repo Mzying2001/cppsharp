@@ -41,6 +41,9 @@ class Delegate;
  */
 template <typename TRet, typename... Args>
 struct ICallable<TRet(Args...)> {
+    /**
+     * @brief Ensures derived callable objects are destroyed correctly.
+     */
     virtual ~ICallable() = default;
 
     /**
