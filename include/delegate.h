@@ -229,15 +229,15 @@ public:
      * @brief Adds a callable to the list.
      * @note Ownership of the raw pointer is transferred to the CallableList.
      * @note Exception safety:
-     *       - The incoming raw pointer is first guarded by a unique_ptr, so
-     *         failures before ownership transfer do not leak it.
-     *       - SINGLE->LIST upgrade uses reserve(2) to avoid reallocation during
-     *         emplace_back; the only failure path is shared_ptr control-block
-     *         allocation, where the shared_ptr constructor guarantees the raw
-     *         pointer is deleted on exception.
-     *       - STATE_LIST branch wraps the raw pointer in a local shared_ptr
-     *         first; even if vector reallocation fails, the local shared_ptr
-     *         destructor correctly frees the object.
+     *       Provides the strong guarantee: if an allocation throws, the existing
+     *       list state is unchanged and the incoming callable is still released.
+     *       - The incoming raw pointer is immediately guarded by a unique_ptr.
+     *       - SINGLE->LIST builds the new vector and shared_ptr entries first,
+     *         moving the stored unique_ptr only after reserve succeeds; the
+     *         final state replacement is noexcept.
+     *       - STATE_LIST converts the incoming unique_ptr to a local shared_ptr
+     *         before insertion, so a failed vector growth leaves both the list
+     *         and ownership cleanup intact.
      */
     void Add(TCallable *callable)
     {
@@ -256,14 +256,16 @@ public:
             case STATE_SINGLE: {
                 TSharedList list;
                 list.reserve(2);
-                list.emplace_back(_GetSingle().release());
-                list.emplace_back(owned.release());
+                std::shared_ptr<TCallable> incoming(std::move(owned));
+                std::shared_ptr<TCallable> current(std::move(_GetSingle()));
+                list.emplace_back(std::move(current));
+                list.emplace_back(std::move(incoming));
                 _Reset(STATE_LIST);
                 _GetList() = std::move(list);
                 break;
             }
             case STATE_LIST: {
-                std::shared_ptr<TCallable> sp(owned.release());
+                std::shared_ptr<TCallable> sp(std::move(owned));
                 _GetList().emplace_back(std::move(sp));
                 break;
             }
